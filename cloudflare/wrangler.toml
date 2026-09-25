@@ -1,0 +1,5 @@
+# Deploy once: npx wrangler deploy (from this folder, after npx wrangler login)
+name = "sqlstepper"
+main = "worker.js"
+compatibility_date = "2026-09-01"
+routes = [{ pattern = "sqlstepper.psbhr.com", custom_domain = true }]

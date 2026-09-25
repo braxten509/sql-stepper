@@ -16,3 +16,14 @@ First run downloads MySQL 8.0 (about 60 MB) into `~/.local/share/sql-stepper` an
 (socket only, no network port). It stops when the app stops. Each Run uses a throwaway database.
 
 Check: `.venv/bin/python test_stepper.py` (or `uv run --with sqlglot==30.19.0 --with pymysql==1.2.3 test_stepper.py`).
+
+## Website (sqlstepper.psbhr.com)
+
+Runs on Google Cloud Run (project `forecaster-b7a86`, service `sqlstepper`, us-central1) from the
+`Dockerfile`: the app plus its own MySQL, set up at build time. Every push to `main` on GitHub builds
+it, runs the test inside it, and puts it live (`.github/workflows/deploy.yml`). Cloudflare points the
+address at it (`cloudflare/`, deployed once with `npx wrangler deploy`).
+
+Because anyone's SQL runs there, each Run gets its own database and a MySQL user that can only touch
+that database, the whole run is stopped after 15 seconds, and there are limits on SQL size, runs per
+visitor per minute, and runs at the same time.

@@ -12,11 +12,13 @@ import atexit
 import json
 import os
 import re
+import secrets
 import shutil
 import signal
 import subprocess
 import sys
 import tarfile
+import threading
 import time
 import urllib.request
 import uuid
@@ -37,6 +39,14 @@ HOME = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share")) / "sq
 BASE, DATA, SOCK = HOME / "mysql", HOME / "data-ci", HOME / "mysql.sock"
 MYSQL_URL = "https://cdn.mysql.com/Downloads/MySQL-8.0/mysql-8.0.46-linux-glibc2.17-x86_64-minimal.tar.xz"
 PORT = int(os.environ.get("PORT", 8765))
+HOST = os.environ.get("HOST", "127.0.0.1")  # 0.0.0.0 inside a container
+# Limits for a public site (anyone's SQL runs here)
+RUN_SECONDS = int(os.environ.get("RUN_SECONDS", 15))  # a whole run is stopped after this long
+MAX_BODY = 200_000  # bytes of SQL per run
+RUNS_PER_MINUTE = int(os.environ.get("RUNS_PER_MINUTE", 120))  # per visitor (a class may share one school IP)
+TRUST_PROXY = bool(os.environ.get("TRUST_PROXY"))  # behind a proxy: the visitor is in X-Forwarded-For
+MAX_STATEMENTS = 2000
+SLOTS = threading.BoundedSemaphore(int(os.environ.get("MAX_PARALLEL", 4)))  # runs at the same time
 MAX_ROWS = 300  # ponytail: display cap per table, raise if you step through big tables
 MAX_ROW_STEPS = 12  # per-row steps shown for one UPDATE/DELETE
 
@@ -48,22 +58,34 @@ MAX_ROW_STEPS = 12  # per-row steps shown for one UPDATE/DELETE
 SQL_MODE = "STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION"
 
 
-def connect():
-    return pymysql.connect(unix_socket=str(SOCK), user="root", autocommit=True, connect_timeout=2,
+def connect(user="root", password="", database=None):
+    """root by default; a run connects as its own throwaway user that only sees its own database."""
+    return pymysql.connect(unix_socket=str(SOCK), user=user, password=password, database=database,
+                           autocommit=True, connect_timeout=2,
                            init_command=f"SET SESSION sql_mode = '{SQL_MODE}'")
 
 
-def start_mysql():
-    try:
-        with connect() as c, c.cursor() as cur:  # already running (left over from a previous session)
-            cur.execute("SELECT @@lower_case_table_names")
-            if cur.fetchone()[0] == 1:
-                return
-            cur.execute("SHUTDOWN")  # an old case-sensitive server: replace it
-        time.sleep(2)
-    except pymysql.err.OperationalError:
-        pass
-    shutil.rmtree(HOME / "data", ignore_errors=True)  # the old case-sensitive folder (only scratch databases)
+def prepare_server():
+    """Once at start: clear what a crashed run may have left behind."""
+    with connect() as c, c.cursor() as cur:
+        cur.execute("SET GLOBAL log_bin_trust_function_creators = 1")  # for a server started with a binary log
+        cur.execute(r"SELECT schema_name FROM information_schema.schemata WHERE schema_name LIKE 'step\_%'")
+        for (db,) in cur.fetchall():
+            cur.execute(f"DROP DATABASE `{db}`")
+        cur.execute(r"SELECT user, host FROM mysql.user WHERE user LIKE 'step\_%'")
+        for u, h in cur.fetchall():
+            cur.execute(f"DROP USER '{u}'@'{h}'")
+
+
+# small and quiet: no binary log (LeetCode-style functions need no DETERMINISTIC), no metrics,
+# little memory, so it fits a small server
+MYSQLD = ["--no-defaults", "--lower-case-table-names=1", "--disable-log-bin", "--performance-schema=OFF",
+          "--innodb-buffer-pool-size=64M", "--innodb-redo-log-capacity=8M", "--max-connections=60",
+          "--skip-name-resolve", "--mysqlx=OFF", "--skip-networking"]
+
+
+def install():
+    """Download MySQL and create its data folder, once (a Docker build runs just this)."""
     if not BASE.exists():
         print("Downloading MySQL 8.0 (one time, about 60 MB)...", flush=True)
         HOME.mkdir(parents=True, exist_ok=True)
@@ -73,20 +95,33 @@ def start_mysql():
             t.extractall(HOME, filter="data")
         tmp.unlink()
         next(HOME.glob("mysql-8.0.*")).rename(BASE)
-    mysqld = str(BASE / "bin/mysqld")
-    common = ["--no-defaults", f"--basedir={BASE}", f"--datadir={DATA}", "--lower-case-table-names=1"]
     if not DATA.exists():
         print("Setting up MySQL data folder (one time)...", flush=True)
-        subprocess.run([mysqld, *common, "--initialize-insecure"], check=True, capture_output=True)
-    proc = subprocess.Popen([mysqld, *common, f"--socket={SOCK}", "--skip-networking", "--mysqlx=OFF",
-                             f"--pid-file={HOME / 'mysqld.pid'}", f"--log-error={HOME / 'mysqld.log'}"])
+        subprocess.run([str(BASE / "bin/mysqld"), *MYSQLD, f"--basedir={BASE}", f"--datadir={DATA}",
+                        "--initialize-insecure"], check=True, capture_output=True)
+
+
+def start_mysql():
+    try:
+        with connect() as c, c.cursor() as cur:  # already running (left over from a previous session)
+            cur.execute("SELECT @@lower_case_table_names")
+            if cur.fetchone()[0] == 1:
+                return prepare_server()
+            cur.execute("SHUTDOWN")  # an old case-sensitive server: replace it
+        time.sleep(2)
+    except pymysql.err.OperationalError:
+        pass
+    shutil.rmtree(HOME / "data", ignore_errors=True)  # the old case-sensitive folder (only scratch databases)
+    install()
+    proc = subprocess.Popen([str(BASE / "bin/mysqld"), *MYSQLD, f"--basedir={BASE}", f"--datadir={DATA}",
+                             f"--socket={SOCK}", f"--pid-file={HOME / 'mysqld.pid'}", f"--log-error={HOME / 'mysqld.log'}"])
     atexit.register(proc.terminate)
     for _ in range(160):
         if proc.poll() is not None:
             break
         try:
             connect().close()
-            return
+            return prepare_server()
         except pymysql.err.OperationalError:
             time.sleep(0.25)
     sys.exit(f"MySQL failed to start. See {HOME / 'mysqld.log'}")
@@ -725,9 +760,16 @@ class Stepper:
         joins = base.args.get("joins") or []
         where, group, having = (base.args.get(k) for k in ("where", "group", "having"))
         later = [k for k in ("distinct", "order", "limit") if base.args.get(k)]
-        if not frm:
-            self.show(final_sql, stmt, scope, "SELECT", lambda n, p: "No FROM, so SELECT just computes the values." + done(n),
-                      final=True)
+        if not frm:  # SELECT (subquery) AS x: step through each subquery, then its answer becomes the value
+            vals = []
+            for e in base.expressions:
+                name = e.alias_or_name or e.sql("mysql")
+                self.subqueries(e, base, pre, scope_ctes, sub(f"subquery for {name}"), stmt)
+                vals.append({"name": name, "sql": e.unalias().sql("mysql"), "sub": isinstance(e.unalias(), exp.Subquery)})
+            self.show(final_sql, stmt, scope, "SELECT " + ", ".join(v["name"] for v in vals),
+                      lambda n, p: "No FROM, so SELECT just computes the values. A subquery used as a value gives its one "
+                                   "answer, or NULL when it finds no rows." + done(n),
+                      final=True, detail={"type": "values", "cols": vals})
             return
 
         sources = [frm.this] + [j.this for j in joins]
@@ -1016,17 +1058,33 @@ class Stepper:
 
 
 def run_all(setup, code):
-    db = "step_" + uuid.uuid4().hex[:12]
-    conn = connect()
-    cur = conn.cursor()
-    cur.execute(f"CREATE DATABASE `{db}`")
-    cur.execute(f"USE `{db}`")
-    cur.execute("SET SESSION max_execution_time = 5000")  # stop runaway SELECTs after 5s
-    # with binary logging on, MySQL 8 refuses CREATE FUNCTION without DETERMINISTIC; LeetCode doesn't
-    cur.execute("SET GLOBAL log_bin_trust_function_creators = 1")
-    st = Stepper(cur)
     stmts = [{"text": s, "phase": "setup"} for s in split_sql(setup)] + \
             [{"text": s, "phase": "code"} for s in split_sql(code)]
+    if len(stmts) > MAX_STATEMENTS:
+        return {"error": f"That's {len(stmts)} statements. The limit is {MAX_STATEMENTS}."}
+    # Each run gets its own database and a user that can only touch that database, since anyone's
+    # SQL runs here. root (admin) sets them up, stops a run that goes too long, and cleans up.
+    name, pw = "step_" + uuid.uuid4().hex[:12], secrets.token_hex(16)
+    admin = connect()
+    acur = admin.cursor()
+    acur.execute(f"CREATE DATABASE `{name}`")
+    acur.execute(f"CREATE USER '{name}'@'%' IDENTIFIED BY '{pw}' WITH MAX_USER_CONNECTIONS 1")
+    acur.execute(f"GRANT ALL ON `{name}`.* TO '{name}'@'%'")
+    conn = connect(name, pw, name)
+    cur = conn.cursor()
+    cur.execute("SET SESSION max_execution_time = 5000")  # stop runaway SELECTs after 5s
+    # the whole run (UPDATE loops, SLEEP, ...) is cut off after RUN_SECONDS
+    killed = threading.Event()
+    def kill():
+        killed.set()
+        with connect() as c, c.cursor() as k:
+            k.execute(f"KILL {conn.thread_id()}")
+    watchdog = threading.Timer(RUN_SECONDS, kill)
+    watchdog.start()
+    def err(e):
+        return (f"Stopped: your code ran longer than {RUN_SECONDS} seconds." if killed.is_set()
+                else f"MySQL error {e.args[0]}: {e.args[-1]}")
+    st = Stepper(cur)
     try:
         for i, s in enumerate(stmts):
             if s["phase"] == "setup":
@@ -1034,7 +1092,7 @@ def run_all(setup, code):
                     cur.execute(s["text"])
                     cur.fetchall()
                 except pymysql.MySQLError as e:
-                    st.add(i, "Error in schema", f"MySQL error {e.args[0]}: {e.args[-1]}", kind="error")
+                    st.add(i, "Error in schema", err(e), kind="error")
                     return {"statements": stmts, "steps": st.steps}
         st.add(None, "Starting tables", "Your schema ran. These are the tables before your code starts.",
                kind="start", tables=[view(n, c, r) for n, (c, r) in st.snapshot().items()])
@@ -1044,7 +1102,7 @@ def run_all(setup, code):
             try:
                 st.statement(s["text"], i)
             except pymysql.MySQLError as e:
-                st.add(i, "Error", f"MySQL error {e.args[0]}: {e.args[-1]}", kind="error")
+                st.add(i, "Error", err(e), kind="error")
                 break
         called = " ".join(s["text"] for s in stmts if s["phase"] == "code" and not PROGRAM.match(s["text"]))
         for f in st.funcs.values():
@@ -1052,16 +1110,34 @@ def run_all(setup, code):
                 try:
                     st.replay(f, ["1"] * len(f["params"]), auto=True)
                 except pymysql.MySQLError as e:
-                    st.add(f["stmt"], "Error", f"MySQL error {e.args[0]}: {e.args[-1]}", kind="error")
+                    st.add(f["stmt"], "Error", err(e), kind="error")
         if not any(s["phase"] == "code" for s in stmts):
             st.steps[-1]["explain"] += " Add some code in the second box to step through it."
     finally:
-        cur.execute(f"DROP DATABASE IF EXISTS `{db}`")
-        conn.close()
+        watchdog.cancel()
+        if conn.open:
+            conn.close()
+        acur.execute(f"DROP USER IF EXISTS '{name}'@'%'")
+        acur.execute(f"DROP DATABASE IF EXISTS `{name}`")
+        admin.close()
     return {"statements": stmts, "steps": st.steps}
 
 
 # ---------- Web server ----------
+
+RECENT = {}  # visitor -> times of their recent runs
+RECENT_LOCK = threading.Lock()
+
+
+def too_many(who):
+    now = time.monotonic()
+    with RECENT_LOCK:
+        if len(RECENT) > 10_000:  # ponytail: crude cleanup, fine for a class-sized site
+            RECENT.clear()
+        times = [t for t in RECENT.get(who, []) if now - t < 60] + [now]
+        RECENT[who] = times
+        return len(times) > RUNS_PER_MINUTE
+
 
 class Handler(BaseHTTPRequestHandler):
     def send(self, code, body, ctype):
@@ -1077,11 +1153,24 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path != "/run":
             return self.send(404, b"", "text/plain")
-        data = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+        size = int(self.headers.get("Content-Length") or 0)
+        if size > MAX_BODY:
+            return self.reply({"error": "That's too much SQL for one run (the limit is about 200 KB)."})
+        who = (self.headers.get("X-Forwarded-For", "").split(",")[0].strip() if TRUST_PROXY else "") or self.client_address[0]
+        if too_many(who):
+            return self.reply({"error": "Too many runs in the last minute. Wait a bit and try again."})
+        if not SLOTS.acquire(timeout=RUN_SECONDS + 5):
+            return self.reply({"error": "The site is busy right now. Try again in a few seconds."})
         try:
-            result = run_all(data.get("setup", ""), data.get("code", ""))
+            data = json.loads(self.rfile.read(size))
+            result = run_all(str(data.get("setup", "")), str(data.get("code", "")))
         except Exception as e:  # show anything unexpected in the page instead of hanging
             result = {"error": f"{type(e).__name__}: {e}"}
+        finally:
+            SLOTS.release()
+        self.reply(result)
+
+    def reply(self, result):
         self.send(200, json.dumps(result).encode(), "application/json")
 
     def log_message(self, *args):
@@ -1091,7 +1180,7 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     url = f"http://127.0.0.1:{PORT}"
     try:
-        server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
+        server = ThreadingHTTPServer((HOST, PORT), Handler)
     except OSError:
         print(f"Already running at {url}")
         webbrowser.open(url)

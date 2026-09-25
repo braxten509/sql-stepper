@@ -1,0 +1,25 @@
+# Every push to main: build the image, run the tests inside it, then put it live on Cloud Run.
+name: deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write  # lets GitHub sign in to Google Cloud without a stored key
+env:
+  IMAGE: us-central1-docker.pkg.dev/forecaster-b7a86/sqlstepper/app:${{ github.sha }}
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t "$IMAGE" .
+      - run: docker run --rm "$IMAGE" python test_stepper.py
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/70559819464/locations/global/workloadIdentityPools/github/providers/github
+          service_account: sqlstepper-deploy@forecaster-b7a86.iam.gserviceaccount.com
+      - uses: google-github-actions/setup-gcloud@v2
+      - run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet && docker push "$IMAGE"
+      - run: gcloud run deploy sqlstepper --image "$IMAGE" --region us-central1 --quiet

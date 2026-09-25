@@ -1,0 +1,7 @@
+.git
+.venv
+__pycache__
+mockups
+.claude-flow
+agentdb.rvf*
+ruvector.db

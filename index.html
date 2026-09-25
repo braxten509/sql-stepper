@@ -147,6 +147,17 @@ u.focus { text-decoration: none; background: color-mix(in srgb, var(--amber) 22%
 .ring { z-index: 3; pointer-events: none; border-radius: 8px; border: 2px solid color-mix(in srgb, var(--blue) 80%, transparent); }
 .ring.col { border-color: color-mix(in srgb, var(--accent) 75%, transparent); border-radius: 7px; }
 .ring.col.out { border-style: dashed; }
+.more { all: unset; margin-left: 7px; color: var(--faint); font: italic 11px var(--mono); cursor: pointer; }
+.more:hover, .more:focus-visible { color: var(--text); text-decoration: underline; }
+#hid { max-width: min(92vw, 900px); max-height: 80vh; padding: 0; border: 1px solid var(--line-2); border-radius: 12px; background: var(--panel); color: var(--text); }
+#hid::backdrop { background: rgba(0, 0, 0, .45); }
+.hid-head { position: sticky; top: 0; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.hid-head .expr { color: var(--muted); font: 12px var(--mono); margin-left: 8px; }
+table.hid { border-collapse: collapse; font: 13px var(--mono); margin: 8px 8px 12px; }
+table.hid th { color: var(--muted); font-weight: 600; text-align: left; }
+table.hid th, table.hid td { padding: 7px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+table.hid .rn { color: var(--faint); }
+.hid-wrap { position: relative; }
 .ring.frame { border: 2px dashed color-mix(in srgb, var(--amber) 85%, transparent); }  /* the rows a window function reads */
 .calc .chk + .chk { margin-top: 6px; }
 .gone { opacity: .45; text-decoration: line-through; }
@@ -160,9 +171,9 @@ u.focus { text-decoration: none; background: color-mix(in srgb, var(--amber) 22%
 /* dock */
 .dock { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .dock .btn { width: 108px; flex: none; }
+.dock #end { width: auto; }
 .dock[hidden] { display: none; }
-.dock .label { font-size: 13px; min-width: 240px; max-width: 440px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dock .label b { font-family: var(--mono); }
+.dock .label { font-size: 13px; color: var(--muted); min-width: 110px; max-width: 440px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 800px) { .line { grid-template-columns: 56px 1fr; } .sub .dots { display: none; } }
 
 /* ---------- app layout: editors on the left, the stepper on the right; the page itself scrolls ---------- */
@@ -218,6 +229,7 @@ textarea:focus-visible { outline: none; }
     <button class="btn" id="prev" aria-label="Previous part">‹ Back</button>
     <div class="label" id="label"></div>
     <button class="btn primary" id="next" aria-label="Next part">Next part ›</button>
+    <button class="btn" id="end" aria-label="Skip to the end">Skip to end »</button>
   </div>
   <button class="btn primary" id="run" title="Run (Ctrl+Enter)"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l14 8-14 8z"/></svg><span>Run</span></button>
 </header>
@@ -237,6 +249,7 @@ textarea:focus-visible { outline: none; }
   </section>
 </main>
 
+<dialog id="hid" aria-labelledby="hid-title"><div class="hid-head"><b id="hid-title"></b><button class="btn" id="hid-x" aria-label="Close">✕</button></div><div id="hid-body"></div></dialog>
 <script>
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -448,7 +461,13 @@ function usedCols(c, cols) {
 // Each part is shown as the same table being changed, not as new tables. A "state" is a table the way a part
 // leaves it: { id, title, cols: [{k, label}], rows: [{k, v, g}] }. Every row and column keeps its key k from
 // part to part, so the board can glide each value from where it was to where it is now.
-let UID = 0, PF = [], PR = [];  // PF[k]: part k's inner steps; PR[k]: [origin, copy] piece pairs (splits, merges, copies)
+let UID = 0, PF = [], PR = [], HID = new Map();  // HID: id -> the rows folded into one row (GROUP BY, COUNT(*) ...)
+// A row that stands for several rows: r.h = { id, title, cols, rows, multi }; multi maps the key of each column whose
+// cell stands for more than one value (aggregates, and columns that differed inside the group) to its SQL at fold time.
+const folds = (title, cols, rows, multi) => { const h = { id: HID.size + 1, title, cols, rows, multi }; HID.set(h.id, h); return h; };
+// those cells get a small [expand] after their value, which opens the folded rows
+const more = (r, cols, cells) => !r.h ? cells : cells.map((c, j) => r.h.multi.has(cols[j]?.k) && c.t !== "…"
+  ? { ...c, h: `${c.h}<button class="more" data-hid="${r.h.id}" data-col="${esc(cols[j].k)}" title="Show the ${r.h.rows.length} rows folded into this one">[expand]</button>`, t: c.t + " [expand]" } : c);  // PF[k]: part k's inner steps; PR[k]: [origin, copy] piece pairs (splits, merges, copies)
 const uid = p => `${p}${++UID}`;
 const same = (a, b) => String(a) === String(b);
 const sameRow = (a, b) => a.length === b.length && a.every((x, i) => same(x, b[i]));
@@ -475,6 +494,8 @@ function adopt(labels, vals, input, title) {
   });
   if (input && vals.length === input.rows.length) rows.forEach((r, i) => { if (!r.k && !used.has(i)) r.k = take(i); });
   rows.forEach(r => { r.k ||= uid("r"); });
+  const hs = new Map((input?.rows || []).filter(r => r.h).map(r => [r.k, r.h]));
+  rows.forEach(r => { if (hs.has(r.k)) r.h = hs.get(r.k); });
   return { id: input?.id || uid("t"), title: title ?? input?.title ?? "", cols, rows };
 }
 // A state as a board table. o.cols / o.cells(row, i) replace the columns and cells, o.rc(row, i) adds a row class.
@@ -482,19 +503,19 @@ function T(st, o = {}) {
   return { id: st.id, title: o.title ?? st.title, right: o.right, cols: o.cols || st.cols,
     rows: st.rows.map((r, i) => ({ k: r.k, c: [MARK[r.m], o.rc?.(r, i)].filter(Boolean).join(" "),
       gc: r.g ? GC[(r.g - 1) % GC.length] : "", gap: o.gaps && i > 0 && r.g !== st.rows[i - 1].g,
-      cells: o.cells ? o.cells(r, i) : r.v.map((x, c) => withOld(r, x, c)) })) };
+      cells: more(r, o.cols || st.cols, o.cells ? o.cells(r, i) : r.v.map((x, c) => withOld(r, x, c))) })) };
 }
 const one = (st, extra = {}) => ({ tables: st ? [T(st)] : [], ...extra });
 const nameOf = (t, fallback) => t.name === "Rows at this stage" ? fallback : t.name;
 
 // ---------- every part's inner steps, worked out once per run, in order ----------
 function prepare() {
-  UID = 0; PF = []; PR = [];
+  UID = 0; PF = []; PR = []; HID = new Map();
   const outs = [], known = {};  // known: each named table as it stands now (starting tables, then after changes)
   MAIN.forEach((s, k) => {
     const p = feeder(k), input = p ? outs[MAIN.indexOf(p)] : fromKnown(s, known);
     let r;
-    try { r = part(s, k, input, known); } catch (e) { console.error(e); r = plainPart(s, input, known); }
+    try { r = part(s, k, input, known, outs); } catch (e) { console.error(e); r = plainPart(s, input, known); }
     PF[k] = r.frames; PR[k] = r.rel || []; outs[k] = r.out;
     const name = (/^(?:CTE|derived table) (\S+)/.exec(s.scope) || [])[1];
     if (name && s.kind === "result" && r.out) known[name.toLowerCase()] = r.out;  // FROM x picks up where the CTE ended
@@ -507,7 +528,7 @@ function fromKnown(s, known) {
     || (s.kind === "change" && s.tables[0] && [0, s.tables[0].name]);
   return m ? known[m[1].toLowerCase()] || null : null;
 }
-function part(s, k, input, known) {
+function part(s, k, input, known, outs) {
   const d = s.detail || {};
   if (s.kind === "start") return startPart(s, known);
   if (!s.tables.length) return { frames: [{ view: one(input) }], out: input };  // an error or a note: the table stays as it was
@@ -516,10 +537,27 @@ function part(s, k, input, known) {
   if (d.type === "filter") return filterPart(s, d, input, k);
   if (d.type === "join" && input) return joinPart(s, d, input, k, known);
   if (d.type === "group" && d.summary) return groupPart(s, d, input);
+  if (d.type === "values") return valuesPart(s, d, k, outs);
   if (d.type === "select" && input && s.tables[0].cols.length === d.cols.length) return selectPart(s, d, input, k);
   if (/^ORDER BY/i.test(s.title) && input) return orderPart(s, input);
   if (/^(LIMIT|DISTINCT)/i.test(s.title) && input) return cutPart(s, input);
   return plainPart(s, input, known);
+}
+
+// SELECT without FROM: each value; a subquery's answer flies down from where its steps ended.
+function valuesPart(s, d, k, outs) {
+  const t = s.tables[0], sub = c => `${s.scope ? s.scope + " › " : ""}subquery for ${c.name}`;
+  const st = { id: uid("t"), title: t.name, cols: t.cols.map(label => ({ label, k: uid("c") })), rows: t.rows.map(r => ({ k: uid("r"), v: r.v })) };
+  const rel = [];
+  const card = d.cols.map((c, j) => {
+    let from = -1;
+    for (let q = k - 1; q >= 0 && MAIN[q].stmt === s.stmt; q--) if (MAIN[q].scope === sub(c) && outs[q]) { from = q; break; }
+    const src = from >= 0 ? outs[from] : null, got = t.rows[0]?.v[j];
+    if (src?.rows[0] && st.rows[0]) rel.push([`${src.rows[0].k}|${src.cols[0].k}`, `${st.rows[0].k}|${st.cols[j].k}`]);
+    return chk(`<span class="expr">${esc(c.name)}</span>`, c.sub ? `<span class="expr">= the subquery's answer</span>` : `<span class="mono">= ${esc(c.sql.length > 80 ? c.sql.slice(0, 80) + "…" : c.sql)}</span>`, to(got))
+      + (c.sub && src && !src.rows.length ? chk(`<span class="expr">the subquery found no rows, so the value is NULL</span>`) : "");
+  }).join("");
+  return { frames: [{ card, view: one(st) }], out: st, rel };
 }
 
 function startPart(s, known) {
@@ -543,7 +581,7 @@ function plainPart(s, input, known) {
   });
   return { frames: [{ view: { tables: sts.map(st => T(st)) } }], out: sts[0] ? clean(sts[0]) : input };
 }
-const clean = st => ({ ...st, rows: st.rows.filter(r => !["dropped", "removed"].includes(r.m)).map(r => ({ k: r.k, v: r.v, g: r.g })) });
+const clean = st => ({ ...st, rows: st.rows.filter(r => !["dropped", "removed"].includes(r.m)).map(r => ({ k: r.k, v: r.v, g: r.g, h: r.h })) });
 
 // INSERT / UPDATE / DELETE result: marks first, then removed rows leave.
 function changePart(s, input, known) {
@@ -571,7 +609,7 @@ function rowsPart(s, input) {
     st.rows.forEach((x, n) => { x.cur = t.rows[n].m === "current"; x.m = x.cur ? gone : t.rows[n].m; x.old = t.rows[n].old; });
     return { label: r.title, view: one(st, { rings: [{ k: "ring:row", table: st.id, rows: st.rows.filter(x => x.cur).map(x => x.k) }] }) };
   });
-  return { frames, out: st && { ...st, rows: st.rows.map(r => ({ k: r.k, v: r.v })) } };
+  return { frames, out: st && { ...st, rows: st.rows.map(r => ({ k: r.k, v: r.v, h: r.h })) } };
 }
 
 // WHERE / HAVING: a check column, then one row (or group) at a time, then the failed ones leave.
@@ -692,10 +730,13 @@ function groupPart(s, d, input) {
     const m = members(g);
     m.slice(1).forEach(r => ["#", ...scols.map(c => c.k)].forEach(c => rel.push([`${m[0].k}|${c}`, `${r.k}|${c}`])));
   }
+  const hids = [], hid = g => hids[g] ??= members(g).length < 2 ? undefined : folds(
+    d.keys.map((kk, j) => `${kk} = ${sum.rows[g - 1].v[j] ?? "NULL"}`).join(", "), a.cols.map(c => c.label), members(g).map(r => r.v),
+    new Map(scols.filter((c, j) => idx[j] < 0 || new Set(members(g).map(r => String(r.v[idx[j]]))).size > 1).map(c => [c.k, c.label])));
   const folded = upto => ({ ...a, cols: scols, rows: sum.rows.flatMap((sr, n) => {
     const g = n + 1, m = members(g);
     if (!m.length) return [];
-    if (g <= upto) return [{ k: m[0].k, g, v: sr.v }];
+    if (g <= upto) return [{ k: m[0].k, g, v: sr.v, h: hid(g) }];
     return m.map(r => ({ k: r.k, g, v: idx.map((i, j) => i >= 0 ? r.v[i] : j < nk ? sr.v[j] : undefined) }));
   }) });
   const na = nk + (d.picked || 0);  // aggregates come after the keys and the picked columns
@@ -727,7 +768,8 @@ function selectPart(s, d, input, k) {
   const title = nameOf(t, "Result");
   if (input.rows.length !== t.rows.length) {  // rows were combined (COUNT(*) without GROUP BY ...): no row-by-row view
     const rings = [...new Set(d.cols.flatMap(c => usedCols(c, labels)))].map(u => ({ k: `ring:col:${input.cols[u].k}`, table: input.id, col: input.cols[u].k }));
-    const out = { id: input.id, title, cols: oc, rows: t.rows.map(r => ({ k: uid("r"), v: r.v })) };
+    const all = input.rows.length > 1 && t.rows.length === 1 ? folds("all rows", input.cols.map(c => c.label), input.rows.map(r => r.v), new Map(oc.map((c, j) => [c.k, d.cols[j].sql]))) : undefined;
+    const out = { id: input.id, title, cols: oc, rows: t.rows.map(r => ({ k: uid("r"), v: r.v, h: all })) };
     const card = (d.aggs || []).map((a, j) => aggHtml(a, "at" in a ? (d.agg_rows || []).map(r => r[a.at]) : input.rows, d.agg_values?.[0]?.[j])).join("");
     return { frames: [{ label: "Columns it reads", sub: d.aggs ? "all rows form one group" : "", card, view: one(input, { rings }) },
       { label: "Result", end: true, view: one(out) }], out };
@@ -882,7 +924,7 @@ function selectPart(s, d, input, k) {
     (c.windows || []).forEach(w => windowFrames(c, ci, w, !c.calc && c.windows.length === 1));
     if (c.calc) calcFrames(c, ci);
   });
-  const out = { id: input.id, title, cols: oc, rows: t.rows.map((r, i) => ({ k: input.rows[inOf[i]].k, v: r.v })) };
+  const out = { id: input.id, title, cols: oc, rows: t.rows.map((r, i) => ({ k: input.rows[inOf[i]].k, v: r.v, h: input.rows[inOf[i]].h })) };
   frames.push({ label: "Result", end: true, view: one(out) });
   return { frames, out, rel };
 }
@@ -1126,9 +1168,10 @@ let was = -1;  // the part shown before, so a move between two parts can use bot
 function show(o = {}) {
   const f = F[sub];
   renderCode(); renderHead();
-  $("#label").innerHTML = `<span style="color:var(--muted)">Part ${cur + 1} of ${MAIN.length}</span> &nbsp; <b>${esc(MAIN[cur].title)}</b>`;
+  $("#label").textContent = `Part ${cur + 1} of ${MAIN.length}`;
   $("#prev").disabled = cur === 0;
   $("#next").disabled = cur === MAIN.length - 1;
+  $("#end").disabled = cur === MAIN.length - 1 && sub === F.length - 1;
   const items = layout(f.view, boardWidth());
   draw(items, [...PR[cur], ...(was >= 0 && was !== cur ? PR[was] : [])], { exitLast: f.exitLast, instant: o.instant });
   was = cur;
@@ -1171,7 +1214,25 @@ async function play() {
 
 $("#prev").onclick = () => { stop(); go(cur - 1); };
 $("#next").onclick = () => { stop(); go(cur + 1); };
+$("#end").onclick = () => { stop(); go(MAIN.length - 1, -1); };  // the last part, at its last step
+function openHidden(id, col) {
+  const h = HID.get(id); if (!h) return;
+  const lit = new Set(usedCols({ sql: h.multi.get(col) || "" }, h.cols));  // the column clicked (or what its aggregate reads)
+  const td = (x, j, tag = "td") => `<${tag}${lit.has(j) ? ' class="lit"' : ""}>${tag === "th" ? esc(x) : cellHtml(x)}</${tag}>`;
+  $("#hid-title").innerHTML = `${plural(h.rows.length, "row")} folded into this row <span class="expr">${esc(h.title)}</span>`;
+  $("#hid-body").innerHTML = `<div class="hid-wrap"><table class="hid"><thead><tr><th>#</th>${h.cols.map((c, j) => td(c, j, "th")).join("")}</tr></thead>
+    <tbody>${h.rows.map((r, n) => `<tr><td class="rn">${n + 1}</td>${r.map((x, j) => td(x, j)).join("")}</tr>`).join("")}</tbody></table></div>`;
+  $("#hid").showModal();
+  // outline the lit columns the way the board does, measured once the table is laid out
+  const tb = $("#hid-body table"), wrap = $("#hid-body .hid-wrap");
+  for (const j of lit) {
+    const th = tb.rows[0].cells[j + 1];
+    wrap.insertAdjacentHTML("beforeend", `<div class="ring col" style="position:absolute; left:${tb.offsetLeft + th.offsetLeft + 2}px; top:${tb.offsetTop + 2}px; width:${th.offsetWidth - 4}px; height:${tb.offsetHeight - 4}px"></div>`);
+  }
+}
+$("#hid").onclick = e => { if (e.target === $("#hid") || e.target.closest("#hid-x")) $("#hid").close(); };  // outside or ✕ closes
 $("#doc").onclick = e => {
+  const m = e.target.closest("[data-hid]"); if (m) return openHidden(+m.dataset.hid, m.dataset.col);
   const b = e.target.closest(".badge[data-i]"); if (b) { stop(); return go(+b.dataset.i); }
   const g = e.target.closest("[data-go]"); if (g) { stop(); return step(sub + +g.dataset.go); }
   const d = e.target.closest("[data-sub]"); if (d) { stop(); return step(+d.dataset.sub); }

@@ -84,4 +84,9 @@ r = run_all(EMP, FN)
 assert any(s["title"] == "set n = n - 1" for s in r["steps"]) and r["steps"][-1]["kind"] == "result", titles(r)
 r = run_all(EMP, FN + "\nSELECT nth(2)")
 assert any(s["title"].startswith("LIMIT 1 OFFSET 1") for s in r["steps"]) and r["steps"][-1]["kind"] == "result", titles(r)
+
+# SELECT with no FROM: the subquery inside is stepped through before its answer becomes the value
+r = run_all(EMP, "SELECT (SELECT salary FROM Employee GROUP BY salary ORDER BY salary DESC LIMIT 1 OFFSET 1) AS second")
+assert any(s["scope"] == "subquery for second" and s["title"] == "FROM Employee" for s in r["steps"]), titles(r)
+assert r["steps"][-1]["detail"]["type"] == "values", titles(r)
 print("all good")
