@@ -44,7 +44,7 @@ HOST = os.environ.get("HOST", "127.0.0.1")  # 0.0.0.0 inside a container
 # Limits for a public site (anyone's SQL runs here)
 RUN_SECONDS = int(os.environ.get("RUN_SECONDS", 15))  # a whole run is stopped after this long
 MAX_BODY = 200_000  # bytes of SQL per run
-RUNS_PER_MINUTE = int(os.environ.get("RUNS_PER_MINUTE", 120))  # per visitor (a class may share one school IP)
+RUNS_PER_MINUTE = int(os.environ.get("RUNS_PER_MINUTE", 600))  # per IP; high because a whole class can share one school IP
 TRUST_PROXY = bool(os.environ.get("TRUST_PROXY"))  # behind a proxy: the visitor is in X-Forwarded-For
 MAX_STATEMENTS = 2000
 # AI chat: any OpenAI-style chat API (OpenRouter by default). No key = no chat button.
@@ -54,10 +54,11 @@ AI_MODEL = os.environ.get("AI_MODEL", "z-ai/glm-5.3-flash")
 # OpenRouter: only these US hosts, and only where chats are neither stored nor used for training
 AI_HOSTS = os.environ.get("AI_HOSTS", "fireworks,together,baseten,deepinfra").split(",")
 AI_NOTE = os.environ.get("AI_NOTE", "GLM 5.3 Flash on US servers that don't store or train on your chats.")
-CHATS_PER_10_MIN = int(os.environ.get("CHATS_PER_10_MIN", 20))  # per visitor
-CHATS_PER_DAY = int(os.environ.get("CHATS_PER_DAY", 60))  # per visitor; the key's own daily $ limit caps everyone
-# set on the website: chat only answers requests that came through the Cloudflare forwarder (which adds
-# this secret and the visitor's real IP), so the limits can't be skipped by calling Cloud Run directly
+# The spending cap is the key's own daily limit at OpenRouter ($0.20), shared by everyone. No per-visitor
+# limit: a class shares one school IP. When the cap is hit the server logs AI_BUDGET_REACHED, and a
+# Google Cloud alert on that line emails the owner.
+# Set on the website: chat only answers requests that came through the Cloudflare forwarder (which adds
+# this secret), so nobody can call Cloud Run directly
 PROXY_SECRET = os.environ.get("PROXY_SECRET", "")
 SLOTS = threading.BoundedSemaphore(int(os.environ.get("MAX_PARALLEL", 4)))  # runs at the same time
 MAX_ROWS = 300  # ponytail: display cap per table, raise if you step through big tables
@@ -1142,15 +1143,15 @@ RECENT = {}  # visitor -> times of their recent runs
 RECENT_LOCK = threading.Lock()
 
 
-def too_many(who, limit=RUNS_PER_MINUTE, window=60):
+def too_many(who):
     now = time.monotonic()
     with RECENT_LOCK:
-        if len(RECENT) > 10_000:  # forget visitors not seen for a day
-            for k in [k for k, v in RECENT.items() if now - v[-1] > 86400]:
+        if len(RECENT) > 10_000:  # forget visitors not seen in the last minute
+            for k in [k for k, v in RECENT.items() if now - v[-1] > 60]:
                 del RECENT[k]
-        times = [t for t in RECENT.get(who, []) if now - t < window] + [now]
+        times = [t for t in RECENT.get(who, []) if now - t < 60] + [now]
         RECENT[who] = times
-        return len(times) > limit
+        return len(times) > RUNS_PER_MINUTE
 
 
 CHAT_RULES = """You are the helper inside SQL Stepper, a website that steps through MySQL 8.0 code like a \
@@ -1198,7 +1199,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply({"error": "That's too much for one request (the limit is about 200 KB)."})
         who = (self.headers.get("X-Forwarded-For", "").split(",")[0].strip() if TRUST_PROXY else "") or self.client_address[0]
         if self.path == "/chat":
-            return self.chat(json.loads(self.rfile.read(size)), who)
+            return self.chat(json.loads(self.rfile.read(size)))
         if too_many(who):
             return self.reply({"error": "Too many runs in the last minute. Wait a bit and try again."})
         if not SLOTS.acquire(timeout=RUN_SECONDS + 5):
@@ -1212,16 +1213,12 @@ class Handler(BaseHTTPRequestHandler):
             SLOTS.release()
         self.reply(result)
 
-    def chat(self, data, who):
+    def chat(self, data):
         """Streams the AI's answer back as plain text while it's being written."""
         if not AI_KEY:
             return self.send(503, b"The AI chat isn't set up on this server.", "text/plain; charset=utf-8")
         if PROXY_SECRET and not secrets.compare_digest(self.headers.get("X-Proxy-Secret", ""), PROXY_SECRET):
             return self.send(403, b"Use the chat at sqlstepper.psbhr.com.", "text/plain; charset=utf-8")
-        if too_many("day " + who, CHATS_PER_DAY, 86400):
-            return self.send(429, b"You've reached today's limit for AI questions. It resets tomorrow.", "text/plain; charset=utf-8")
-        if too_many("chat " + who, CHATS_PER_10_MIN, 600):
-            return self.send(429, b"That's a lot of questions in a short time. Wait a few minutes and try again.", "text/plain; charset=utf-8")
         req = urllib.request.Request(AI_URL, json.dumps({"model": AI_MODEL, "messages": chat_prompt(data), "stream": True, "max_tokens": 1000,
                                                           "provider": {"only": AI_HOSTS, "zdr": True, "data_collection": "deny"}}).encode(),
                                      {"Authorization": f"Bearer {AI_KEY}", "Content-Type": "application/json",
@@ -1229,9 +1226,12 @@ class Handler(BaseHTTPRequestHandler):
         try:
             upstream = urllib.request.urlopen(req, timeout=60)
         except urllib.error.HTTPError as e:
-            print("chat error", e.code, e.read()[:300], flush=True)
-            msg = {402: "The AI chat has used up its budget for this month. It will be back next month.",
-                   429: "The AI is busy right now. Try again in a minute."}.get(e.code, "The AI couldn't answer right now. Try again in a bit.")
+            why = e.read()[:300]
+            if e.code in (402, 403) and re.search(rb"limit|credit", why, re.I):  # the daily $ cap
+                print("AI_BUDGET_REACHED", e.code, why, flush=True)
+                return self.send(502, b"The AI helper has reached today's limit. It will be back tomorrow.", "text/plain; charset=utf-8")
+            print("chat error", e.code, why, flush=True)
+            msg = "The AI is busy right now. Try again in a minute." if e.code == 429 else "The AI couldn't answer right now. Try again in a bit."
             return self.send(502, msg.encode(), "text/plain; charset=utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "text/plain; charset=utf-8")
