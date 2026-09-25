@@ -1315,7 +1315,15 @@ document.addEventListener("keydown", e => {
   else if (e.key === " ") { e.preventDefault(); play(); }
 });
 let resizing;
-addEventListener("resize", () => { clearTimeout(resizing); resizing = setTimeout(() => MAIN.length && $("#board") && show({ instant: true }), 150); });
+// The stepper is normally 1080px wide; a wider table widens it (as far as the window allows) so the table
+// shows whole instead of scrolling. Sized once per run from the widest table in any part, so it stays still.
+let widest = 0;
+function fitWidth() {
+  const v = $(".view"), cs = getComputedStyle(v);
+  const room = v.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  $("#doc").style.maxWidth = Math.min(room, Math.max(1080, widest + 36 + 2 + 40)) + "px";  // board padding, border, rings
+}
+addEventListener("resize", () => { clearTimeout(resizing); resizing = setTimeout(() => { if (MAIN.length && $("#board")) { fitWidth(); show({ instant: true }); } }, 150); });
 
 // ---------- AI helper: a chat that sees the schema, the code and the step on screen ----------
 const CHAT = [];
@@ -1425,14 +1433,16 @@ async function run() {
     build(data);
     if (!MAIN.length) throw new Error("There was nothing to step through.");
     prepare();
+    widest = Math.max(0, ...PF.flat().flatMap(f => layout(f.view, Infinity).filter(i => i.cls === "box").map(i => i.w)));
     timer = null; was = -1;
     $(".dock").hidden = false;
     $("#doc").innerHTML = `<div class="card codebox" id="codebox"></div>
       <div class="card stage"><div class="stage-head" id="shead"></div><div class="board-wrap"><div id="board"></div></div></div>`;
     clearBoard();
+    fitWidth();
     go(Math.max(0, MAIN.findIndex(m => m.kind === "error")), 0, { instant: true });  // an error is what the user needs to see first
   } catch (e) {
-    MAIN = []; timer = null;
+    MAIN = []; timer = null; $("#doc").style.maxWidth = "";
     $(".dock").hidden = true;
     $("#doc").innerHTML = `<div class="error-box"><b>Something went wrong.</b><br>${esc(e.message)}</div>`;
   } finally {

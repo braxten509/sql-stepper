@@ -1,6 +1,6 @@
 # SQL Stepper for Cloud Run: the app plus its own private MySQL, set up at build time so it starts fast
-FROM python:3.12-slim-bookworm
-RUN apt-get update && apt-get install -y --no-install-recommends libaio1 libnuma1 && rm -rf /var/lib/apt/lists/* \
+FROM python:3.12-slim-bookworm@sha256:392307d22300de8b5986851a12d9176dfc0fc073e65bf6523ebd7dcbeb23564e
+RUN apt-get update && apt-get install -y --no-install-recommends libaio1 libnuma1 tzdata=2026c-0+deb12u1 && rm -rf /var/lib/apt/lists/* \
  && pip install --no-cache-dir sqlglot==30.19.0 pymysql==1.2.3 \
  && useradd -m app
 USER app
