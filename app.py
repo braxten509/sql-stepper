@@ -240,6 +240,23 @@ LEAF = (exp.Column, exp.AggFunc, exp.Window, exp.Subquery, exp.Case, exp.If)
 NO_FRAME = {"ROW_NUMBER", "RANK", "DENSE_RANK", "PERCENT_RANK", "CUME_DIST", "NTILE", "LAG", "LEAD"}  # the rest read a frame
 
 
+def fname(e, text=""):
+    """A function's name as the user wrote it (IFNULL, BIT_OR), not sqlglot's (COALESCE, BITWISE_OR_AGG)."""
+    m = e.meta
+    if "start" in m and text and re.fullmatch(r"\w+", text[m["start"]:m["end"] + 1]):
+        return text[m["start"]:m["end"] + 1].upper()
+    return e.name.upper() if isinstance(e, exp.Anonymous) else e.sql_name()
+
+
+def as_written(e, text=""):
+    """An expression's SQL with function names as the user wrote them."""
+    out = e.sql("mysql")
+    for f in e.find_all(exp.Func):
+        if fname(f, text) != f.sql_name():
+            out = out.replace(f.sql_name() + "(", fname(f, text) + "(", 1)
+    return out
+
+
 def unwrap(e):
     """(x) and sqlglot's hidden type wrappers (YEAR(d) holds d inside one) show as x."""
     while True:
@@ -274,18 +291,66 @@ def calc_steps(top, text, ref):
             if isinstance(b, LEAF) or is_step(b):
                 cp.replace(exp.Var(this=f"__A{len(args)}__"))
                 args.append(ref(b.sql("mysql")))
-        tpl, m = c.sql("mysql"), e.meta
-        if isinstance(e, exp.Func) and "start" in m and text:  # IFNULL, not the COALESCE sqlglot writes
-            name = text[m["start"]:m["end"] + 1]
-            if tpl.upper().startswith(e.sql_name() + "(") and re.fullmatch(r"\w+", name):
-                tpl = name + tpl[len(e.sql_name()):]
+        tpl = c.sql("mysql")
+        if isinstance(e, exp.Func) and tpl.upper().startswith(e.sql_name() + "("):  # IFNULL, not the COALESCE sqlglot writes
+            tpl = fname(e, text) + tpl[len(e.sql_name()):]
         steps.append({"tpl": tpl, "args": args, "at": ref(e.sql("mysql"))})
 
     visit(top)
     return steps
 
 
-def window_detail(w, ref):
+def agg_info(a, ref, text=""):
+    """What goes into an aggregate: the value it reads from each row (none for COUNT(*)), and DISTINCT."""
+    this = a.this
+    if isinstance(this, exp.Order):  # GROUP_CONCAT(x ORDER BY y)
+        this = this.this
+    d = {"sql": a.sql("mysql"), "fn": fname(a, text), "distinct": isinstance(this, exp.Distinct)}
+    if isinstance(this, exp.Distinct):
+        this = this.expressions[0]  # ponytail: COUNT(DISTINCT a, b) shows a only
+    if isinstance(this, exp.Expression) and not isinstance(this, exp.Star):
+        d["arg"], d["at"] = as_written(this, text), ref(this.sql("mysql"))
+    return d
+
+
+def top_aggs(exprs):
+    """The aggregates in these expressions (not the ones inside a window or a subquery), by their SQL."""
+    return {a.sql("mysql"): a for e in exprs for a in e.find_all(exp.AggFunc)
+            if not a.find_ancestor(exp.Window, exp.Subquery)}
+
+
+def inline_window(w, defs):
+    """OVER w / OVER (w ROWS ...) with the WINDOW clause filled in, so it can be run and replayed on its own."""
+    name = w.args.get("alias")
+    if not name:
+        return w
+    base = defs.get(name.name if isinstance(name, exp.Expression) else str(name))
+    if base is None:
+        return None
+    base = inline_window(base, defs)
+    if base is None:
+        return None
+    pick = lambda k: w.args.get(k) or base.args.get(k)
+    return exp.Window(this=w.this.copy(), partition_by=[p.copy() for p in pick("partition_by") or []],
+                      order=pick("order").copy() if pick("order") else None, spec=pick("spec").copy() if pick("spec") else None)
+
+
+def inline_windows(node):
+    """Spell every OVER w out from its WINDOW clause (sqlglot writes WINDOW w2 AS (w) back wrong, so every
+    query the stepper builds from this one would fail). The page still points at what the user wrote."""
+    for sel in list(node.find_all(exp.Select)):
+        defs = {wd.this.name if isinstance(wd.this, exp.Expression) else str(wd.this): wd for wd in sel.args.get("windows") or []}
+        if not defs:
+            continue
+        for w in list(sel.find_all(exp.Window)):
+            full = inline_window(w, defs) if w.args.get("alias") and w.find_ancestor(exp.Select) is sel else None
+            if full is not None:
+                full.meta["shown"] = w.sql("mysql")
+                w.replace(full)
+        sel.set("windows", None)
+
+
+def window_detail(w, ref, shown=None, text=""):
     """What the page needs to replay a window function: each row's partition and place in the sorted
     order, the value it reads, and (for functions that read a frame) the last row of its frame and its size."""
     f = w.this
@@ -293,7 +358,7 @@ def window_detail(w, ref):
     order = w.args.get("order")
     ords = order.expressions if order else []
     over = (f"PARTITION BY {', '.join(part)} " if part else "") + (f"ORDER BY {', '.join(o.sql('mysql') for o in ords)}" if ords else "")
-    d = {"fn": f.name.upper() if isinstance(f, exp.Anonymous) else f.sql_name(), "sql": w.sql("mysql"),
+    d = {"fn": fname(f, text), "sql": shown or w.sql("mysql"),
          "part": part, "order": [{"sql": o.this.sql("mysql"), "desc": bool(o.args.get("desc"))} for o in ords],
          "spec": w.args["spec"].sql("mysql") if w.args.get("spec") else None,
          "res": ref(w.sql("mysql")), "pos": ref(f"ROW_NUMBER() OVER ({over})"),
@@ -402,6 +467,8 @@ class Stepper:
             node = sqlglot.parse_one(text, read="mysql")
         except sqlglot.errors.SqlglotError:
             node = None
+        if node is not None:
+            inline_windows(node)
         if isinstance(node, exp.Query):
             self.run(text)  # real error? fail here, before any previews
             self.query(node, [], "", i, raw=text)
@@ -650,16 +717,20 @@ class Stepper:
         keys = [resolve(k).sql("mysql") for k in group.expressions] if group else []
         if group:
             ks = ", ".join(keys)
-            step(f"{pre}SELECT {star}, DENSE_RANK() OVER (ORDER BY {ks}) AS `__grp` {body} ORDER BY {ks}",
+            order = base.args.get("order")
+            found = top_aggs(base.expressions + ([resolve(having.this)] if having else []) + (order.expressions if order else []))
+            aggs, argcols = list(found), []
+
+            def ref(sql):
+                argcols.append(f"({sql})")
+                return len(argcols) - 1
+            ainfo = [agg_info(a, ref, self.text) for a in found.values()]
+            step(f"{pre}SELECT {star}, DENSE_RANK() OVER (ORDER BY {ks}) AS `__grp`{''.join(', ' + c for c in argcols)} {body} ORDER BY {ks}",
                  group.sql("mysql"),
                  lambda n, p: f"GROUP BY gathers rows with the same {ks} into one group. Each color band below is one "
                               f"group. From here on, each group becomes a single row, so only the grouped columns "
                               f"and aggregates like COUNT() or SUM() can be shown.",
-                 labels=labels, grouped=True)
-            order = base.args.get("order")
-            aggs = list(dict.fromkeys(a.sql("mysql") for e in base.expressions + ([resolve(having.this)] if having else [])
-                                      + (order.expressions if order else [])
-                                      for a in e.find_all(exp.AggFunc) if not a.find_ancestor(exp.Window, exp.Subquery)))
+                 labels=labels, grouped=True, extra=len(argcols), detail={})
             # each group collapses to one whole row: the other columns hold the value MySQL picks from the group
             norm = lambda x: x.replace("`", "").lower()
             refs = [f"`{a}`.`{c}`" for a, cs in zip(names, src_cols) for c in cs]
@@ -668,6 +739,7 @@ class Stepper:
                 cols, rows = self.run(f"{pre}SELECT {', '.join(keys + [f'ANY_VALUE({r})' for _, r in other] + aggs)} "
                                       f"{body} GROUP BY {ks} ORDER BY {ks}")
                 self.steps[-1]["detail"] = {
+                    **(self.steps[-1].get("detail") or {}), "aggs": ainfo,  # rows: what each aggregate reads per row
                     "type": "group", "keys": keys, "picked": len(other),
                     "summary": view("After GROUP BY", keys + [lab for lab, _ in other] + aggs, rows),
                     "aliases": {e.this.sql("mysql"): e.alias for e in base.expressions if isinstance(e, exp.Alias)}}
@@ -769,13 +841,25 @@ class Stepper:
                     extra += [f"({cond.sql('mysql')})", *pcols]
             else:
                 windows = [w for w in inner.find_all(exp.Window) if not w.find_ancestor(exp.Subquery)]
-                if windows and not any(w.args.get("alias") for w in windows):  # ponytail: OVER w (named) shows no replay
-                    d["windows"] = [window_detail(w, ref) for w in windows]
+                if windows:
+                    d["windows"] = [window_detail(w, ref, w.meta.get("shown"), self.text) for w in windows]
                 steps = calc_steps(inner, self.text, ref)
                 if steps:
                     d["calc"] = steps
             cols.append(d)
         detail = {"type": "select", "cols": cols}
+        found = {} if base.args.get("group") else top_aggs(base.expressions)
+        if found:  # no GROUP BY: all rows form one group
+            args = []
+            detail["aggs"] = [agg_info(a, lambda sql: args.append(sql) or len(args) - 1, self.text) for a in found.values()]
+            try:
+                for sqls, key in ((args, "agg_rows"), (list(found), "agg_values")):
+                    if sqls:
+                        q3 = q.copy()
+                        q3.set("expressions", [sqlglot.parse_one(x, read="mysql") for x in sqls])
+                        detail[key] = [[cell(x) for x in r] for r in self.run(pre + q3.sql("mysql"))[1][:MAX_ROWS]]
+            except (pymysql.MySQLError, sqlglot.errors.SqlglotError):
+                pass
         if extra:  # run once more with the extra values, then line those rows up with the shown rows by value
             q2 = q.copy()
             for x in extra:

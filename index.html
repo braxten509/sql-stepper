@@ -149,6 +149,7 @@ u.focus { text-decoration: none; background: color-mix(in srgb, var(--amber) 22%
 .ring.col.out { border-style: dashed; }
 .ring.frame { border: 2px dashed color-mix(in srgb, var(--amber) 85%, transparent); }  /* the rows a window function reads */
 .calc .chk + .chk { margin-top: 6px; }
+.gone { opacity: .45; text-decoration: line-through; }
 .calc.sub { margin: 4px 0 6px 22px; padding-left: 12px; border-left: 2px solid var(--line); font-size: 13px; }
 .ring.col.out, .ring.col.pick { border-color: color-mix(in srgb, var(--green) 85%, transparent); }  /* green: going into the result */
 /* a quick glow on a value that just arrived or changed (an overlay, so it never fights the row's own tint) */
@@ -366,6 +367,21 @@ function checkVals(d, raw) {
 // A calculation's steps, innermost first, each with this row's values: ROUND( 3.85 , 1) → 3.9
 const calcHtml = (steps, x) => steps.map(st => `<div class="chk"><span class="mono">${st.tpl.split(/__A(\d+)__/)
   .map((p, j) => j % 2 ? v(x[st.args[+p]]) : esc(p)).join("")}</span><span class="arrow-r">→</span>${v(x[st.at])}</div>`).join("");
+const chk = (...h) => `<div class="chk">${h.join(" ")}</div>`, to = x => `<span class="arrow-r">→</span>${v(x)}`;
+// What went into an aggregate: each row's value (NULLs and DISTINCT repeats crossed out, as MySQL skips them)
+function aggHtml(a, xs, res) {
+  const end = res === undefined ? "" : to(res);
+  if (!("at" in a)) return chk(`<span class="mono">${esc(a.sql)}</span>`, `<span class="expr">counts the rows:</span> <b>${xs.length}</b>`, end);
+  const seen = new Set(); let nulls = 0, dups = 0;
+  const items = xs.map(x => {
+    const dup = a.distinct && x !== null && seen.has(String(x));
+    if (x === null) nulls++; else if (dup) dups++; else seen.add(String(x));
+    return x === null || dup ? `<span class="gone">${v(x)}</span>` : v(x);
+  });
+  const note = [nulls && "NULLs are skipped", dups && "repeats are skipped (DISTINCT)"].filter(Boolean).join(", ");
+  return chk(`<span class="mono">${esc(a.fn)}(${a.distinct ? "DISTINCT " : ""}</span>${items.slice(0, 16).join(" ")}${items.length > 16 ? ` <span class="expr">+${items.length - 16} more</span>` : ""}<span class="mono">)</span>`, end)
+    + (a.arg && !/^[\w`.]+$/.test(a.arg) ? chk(`<span class="expr">each value is ${esc(a.arg)}</span>`) : "") + (note ? chk(`<span class="expr">${note}</span>`) : "");
+}
 function checkLines(d, raw, aliases = {}) {
   let i = 0;
   return d.checks.map(c => {
@@ -415,25 +431,6 @@ function groupKey(d) {
   const nk = d.keys.length, rows = d.summary.rows, MAX = 16;
   const items = rows.slice(0, MAX).map((r, g) => `<span><i style="background:${GC[g % GC.length]}"></i>Group ${g + 1}<em>${esc(r.v.slice(0, nk).map(x => x ?? "NULL").join(", "))}</em></span>`);
   return `<div class="gkey"><b>${esc(d.keys.join(", "))}</b>${items.join("")}${rows.length > MAX ? `<span>+${rows.length - MAX} more</span>` : ""}</div>`;
-}
-
-function groupFrames(s, d, t) {
-  const sum = d.summary, G = sum.rows.length, nk = d.keys.length;
-  const sumCols = sum.cols.map(c => d.aliases && d.aliases[c] ? `${c} → ${d.aliases[c]}` : c);
-  const out = [{ label: "Sorted into groups",
-    body: grid(t.cols, t.rows, { key: "rows", title: "Rows sorted into groups (one color per group)", right: `${plural(G, "group")} · ${plural(t.rows.length, "row")}` }) }];
-  for (let g = 1; g <= G; g++) {
-    const members = t.rows.filter(r => r.g === g), key = sum.rows[g - 1].v.slice(0, nk);
-    const na = nk + (d.picked || 0);  // aggregates come after the keys and the picked columns
-    const aggs = sum.cols.slice(na).map((c, j) => `<div class="chk"><span class="expr">${esc(c)}</span><span class="arrow-r">→</span>${v(sum.rows[g - 1].v[na + j])}</div>`).join("");
-    out.push({ label: `Group ${g} of ${G}`, sub: d.keys.map((k, j) => `${k} = ${key[j] ?? "NULL"}`).join(", "),
-      card: aggs,
-      body: grid(t.cols, t.rows.map(r => ({ v: r.v, g: r.g, m: r.g === g ? "grp" : undefined })), { key: "rows", title: "Rows in each group", right: plural(G, "group") }) +
-        grid(sumCols, sum.rows.slice(0, g).map((r, j) => ({ v: r.v, m: j === g - 1 ? "new" : undefined })), { key: "out", title: "After GROUP BY", right: `${g} of ${plural(G, "row")}` }) });
-  }
-  out.push({ label: "Result", end: true,
-    body: grid(sumCols, sum.rows.map(r => ({ v: r.v })), { key: "out", title: "After GROUP BY" }) });
-  return out;
 }
 
 // input columns an expression reads (by name), so they can be outlined in the input table
@@ -702,11 +699,17 @@ function groupPart(s, d, input) {
   const frames = [
     { label: "Groups", view: one(colored) },
     { label: "Sorted into groups", view: { tables: [T(a, { gaps: true })] } }];
+  // Each group is shown with its rows still apart and the values its aggregates read lit up; it folds on the next step.
+  const scl = scols.map(c => c.label), aggs = d.aggs && d.aggs.length === sum.cols.length - na ? d.aggs : null;
+  const lit = new Set((aggs || []).flatMap(x => x.arg ? usedCols({ sql: x.arg }, scl) : []));
   for (let g = 1; g <= Math.min(G, 40); g++) {
-    const key = sum.rows[g - 1].v.slice(0, nk), st = folded(g);
+    const key = sum.rows[g - 1].v.slice(0, nk), res = j => sum.rows[g - 1].v[na + j];
+    const at = t.rows.map((r, i) => i).filter(i => t.rows[i].g === g);  // this group's rows in the step's data
     frames.push({ label: `Group ${g} of ${G}`, sub: d.keys.map((kk, j) => `${kk} = ${key[j] ?? "NULL"}`).join(", "),
-      card: sum.cols.slice(na).map((c, j) => `<div class="chk"><span class="expr">${esc(c)}</span><span class="arrow-r">→</span>${v(sum.rows[g - 1].v[na + j])}</div>`).join(""),
-      view: { tables: [T(st, { gaps: true })], rings: [{ k: "ring:row", table: a.id, rows: [members(g)[0]?.k] }] } });
+      card: aggs ? aggs.map((x, j) => aggHtml(x, "at" in x ? at.map(i => d.rows?.[i]?.[x.at] ?? null) : at, res(j))).join("")
+        : sum.cols.slice(na).map((c, j) => chk(`<span class="expr">${esc(c)}</span>`, to(res(j)))).join(""),
+      view: { tables: [T(folded(g - 1), { gaps: true, cells: r => r.v.map((x, c) => r.g === g && lit.has(c) ? hot(x) : cv(x)) })],
+        rings: [{ k: "ring:row", table: a.id, rows: members(g).map(r => r.k) }] } });
   }
   const out = folded(G);
   frames.push({ label: "Result", end: true, view: one(out) });
@@ -722,7 +725,9 @@ function selectPart(s, d, input, k) {
   if (input.rows.length !== t.rows.length) {  // rows were combined (COUNT(*) without GROUP BY ...): no row-by-row view
     const rings = [...new Set(d.cols.flatMap(c => usedCols(c, labels)))].map(u => ({ k: `ring:col:${input.cols[u].k}`, table: input.id, col: input.cols[u].k }));
     const out = { id: input.id, title, cols: oc, rows: t.rows.map(r => ({ k: uid("r"), v: r.v })) };
-    return { frames: [{ label: "Columns it reads", view: one(input, { rings }) }, { label: "Result", end: true, view: one(out) }], out };
+    const card = (d.aggs || []).map((a, j) => aggHtml(a, "at" in a ? (d.agg_rows || []).map(r => r[a.at]) : input.rows, d.agg_values?.[0]?.[j])).join("");
+    return { frames: [{ label: "Columns it reads", sub: d.aggs ? "all rows form one group" : "", card, view: one(input, { rings }) },
+      { label: "Result", end: true, view: one(out) }], out };
   }
   // columns copied straight from an input column (a name, or an aggregate GROUP BY already worked out)
   const norm = x => x.replace(/`/g, "").toLowerCase();
@@ -763,12 +768,11 @@ function selectPart(s, d, input, k) {
         { k: "ring:out", table: input.id, col: oc[ci].k, c: "out" }, ...extra] };
   };
   const frames = [], R = Math.min(t.rows.length, 40);  // ponytail: 40 rows replayed per column
+  const vals = xs => xs.slice(0, 12).map(v).join(" ") + (xs.length > 12 ? ` <span class="expr">+${xs.length - 12} more</span>` : "");
   // CASE and calculations go down the table as shown (MySQL may hand the output rows back in another order)
   const down = input.rows.slice(0, R).map((r, n) => outOf[n]);
   const eachRow = f => down.forEach((i, k) => { const upto = new Set(down.slice(0, k + 1));
     f(i, { label: `Row ${k + 1} of ${t.rows.length}`, done: j => upto.has(j), hot: j => j === i }); });
-  const chk = (...h) => `<div class="chk">${h.join(" ")}</div>`, to = x => `<span class="arrow-r">→</span>${v(x)}`;
-  const vals = xs => xs.slice(0, 12).map(v).join(" ") + (xs.length > 12 ? ` <span class="expr">+${xs.length - 12} more</span>` : "");
 
   // CASE / IF: which WHEN each row hits
   const caseFrames = (c, ci) => eachRow((ri, o) => {
