@@ -233,6 +233,9 @@ body.chatting main { margin-right: 400px; }
 .msg.ai code { font: 12.5px var(--mono); padding: 1px 5px; border-radius: 4px; background: var(--panel-2); }
 .msg.ai pre { margin: 4px 0 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); overflow: auto; font: 12.5px/1.55 var(--mono); }
 .msg.ai pre code { padding: 0; background: none; }
+.msg.ai table { margin: 4px 0 8px; border-collapse: collapse; font: 12.5px var(--mono); display: block; overflow-x: auto; }
+.msg.ai th, .msg.ai td { padding: 4px 10px; border: 1px solid var(--line); text-align: left; white-space: nowrap; }
+.msg.ai th { background: var(--panel-2); font-weight: 600; }
 .msg.err { color: var(--red); }
 .msg.typing > :last-child::after, .msg.typing:empty::after { content: "▍"; margin-left: 2px; color: var(--accent); animation: blink 1s steps(1) infinite; }
 @keyframes blink { 50% { opacity: 0; } }
@@ -1293,8 +1296,15 @@ fetch("/config").then(r => r.json()).then(c => { if (c.ai) { $("#ask").hidden = 
 const inline = s => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/^#{1,4} (.*)$/, "<b>$1</b>");
 function mdText(t) {
   let out = "", list = null;
-  const close = () => { if (list) out += `</${list}>`; list = null; };
+  const close = () => { if (list) out += `</${list === "table" ? "tbody></table" : list}>`; list = null; };
   for (const l of t.split("\n")) {
+    if (/^\s*\|.*\|\s*$/.test(l)) {  // a table row; the |---| line under the header is skipped
+      if (/^[\s|:-]+$/.test(l)) continue;
+      const cells = l.trim().slice(1, -1).split("|").map(c => inline(c.trim()));
+      if (list !== "table") { close(); out += `<table><thead><tr>${cells.map(c => `<th>${c}</th>`).join("")}</tr></thead><tbody>`; list = "table"; }
+      else out += `<tr>${cells.map(c => `<td>${c}</td>`).join("")}</tr>`;
+      continue;
+    }
     const m = l.match(/^\s*(?:([-*•])|\d+[.)])\s+(.*)/);
     if (!m) { close(); if (l.trim()) out += `<p>${inline(l)}</p>`; continue; }
     const k = m[1] ? "ul" : "ol";
