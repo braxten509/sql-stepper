@@ -1159,7 +1159,8 @@ DISTINCT, ORDER BY, LIMIT), showing the table at each step. Users are mostly stu
 LeetCode-style SQL problems. You get their schema, their code, and the step they are looking at.
 Answer their question about it. Be short, plain, and friendly; use the actual table and column names \
 and values. Put SQL in ```sql blocks. If their code has a bug, say exactly what and show the fix. \
-Only help with SQL and databases."""
+The server runs MySQL 8.0 without ONLY_FULL_GROUP_BY, like LeetCode, so selecting a column that isn't \
+grouped or aggregated is allowed (MySQL picks a value from the group). Only help with SQL and databases."""
 
 
 def chat_prompt(data):
