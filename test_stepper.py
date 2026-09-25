@@ -1,3 +1,7 @@
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["sqlglot==30.19.0", "pymysql==1.2.3"]
+# ///
 """Regression checks against a private, temporary MySQL data directory."""
 
 import os
