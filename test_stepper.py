@@ -73,4 +73,15 @@ r = run_all(EMP, "SELECT name FROM Employee WHERE dept='A' UNION SELECT name FRO
 assert r["steps"][-1]["title"] == "UNION" and len(final(r)) == 4, titles(r)
 r = run_all(EMP, "SELECT nope FROM Employee; SELECT 1")
 assert r["steps"][-1]["kind"] == "error" and "nope" in r["steps"][-1]["explain"], r["steps"][-1]
+
+# LeetCode-style function: the body's ; don't split it, and it gets called and stepped through
+FN = """CREATE FUNCTION nth(N INT) RETURNS INT
+BEGIN
+  set n = n - 1;
+  RETURN (select salary from Employee group by salary order by salary desc limit 1 offset n);
+END"""
+r = run_all(EMP, FN)
+assert any(s["title"] == "set n = n - 1" for s in r["steps"]) and r["steps"][-1]["kind"] == "result", titles(r)
+r = run_all(EMP, FN + "\nSELECT nth(2)")
+assert any(s["title"].startswith("LIMIT 1 OFFSET 1") for s in r["steps"]) and r["steps"][-1]["kind"] == "result", titles(r)
 print("all good")

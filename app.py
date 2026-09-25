@@ -97,8 +97,25 @@ def start_mysql():
 STMT_START = re.compile(r"\s*(select|with|insert|update|delete|create|drop|alter|truncate|replace)\b", re.I)
 
 
+PROGRAM = re.compile(r"\s*create\s+(?:definer\s*=\s*\S+\s+)?(function|procedure|trigger)\s+`?(\w+)`?", re.I)
+
+
+def blocks(sql):
+    """Inside CREATE FUNCTION/PROCEDURE/TRIGGER: how many BEGIN (or CASE) blocks are still open at the end,
+    and where the outermost one closed (its ; end inner statements, not the CREATE)."""
+    if not PROGRAM.match(sql):
+        return 0, None
+    depth, closed = 0, None
+    blank = re.sub(r"'(?:\\.|[^'\\])*'|\"(?:\\.|[^\"\\])*\"|`[^`]*`", lambda m: " " * len(m.group()), sql)
+    for m in re.finditer(r"\b(begin|case|end)\b(\s+(?:if|while|loop|repeat)\b)?", blank, re.I):
+        depth += 1 if m.group(1).lower() in ("begin", "case") else -1 if not m.group(2) else 0
+        if depth == 0 and closed is None and m.group(1).lower() == "end":
+            closed = m.end()
+    return depth, closed
+
+
 def split_semicolons(text):
-    """Split on ; outside quotes, dropping comments."""
+    """Split on ; outside quotes (and outside a stored program's BEGIN ... END), dropping comments."""
     parts, buf, q, i = [], [], None, 0
     while i < len(text):
         c = text[i]
@@ -111,6 +128,8 @@ def split_semicolons(text):
                 q = None
         elif c in "'\"`":
             q = c
+        elif c == ";" and blocks("".join(buf))[0] > 0:
+            pass  # kept below: it ends a statement inside the body
         elif c == ";":
             parts.append("".join(buf))
             buf, i = [], i + 1
@@ -143,6 +162,10 @@ def split_sql(text):
     if everything before it already parses as a complete statement."""
     out = []
     for chunk in split_semicolons(text):
+        if PROGRAM.match(chunk):  # a function's body has lines like "select ..." that are not new statements
+            end = blocks(chunk)[1] or len(chunk)
+            out.append(chunk[:end].strip())
+            chunk = chunk[end:]
         cur = []
         for line in chunk.split("\n"):
             if cur and STMT_START.match(line) and parses("\n".join(cur)):
@@ -443,7 +466,7 @@ def owner_query(node):
 
 class Stepper:
     def __init__(self, cur):
-        self.cur, self.steps, self.text = cur, [], ""
+        self.cur, self.steps, self.text, self.funcs = cur, [], "", {}
 
     def run(self, sql):
         self.cur.execute(sql)
@@ -463,6 +486,16 @@ class Stepper:
 
     def statement(self, text, i):
         self.text = text  # parsed nodes point into this (function names as the user wrote them)
+        prog = PROGRAM.match(text)
+        if prog:
+            self.cur.execute(text)
+            kind, name = prog.group(1).upper(), prog.group(2)
+            m = re.match(r"\s*\(([^)]*)\)[\s\S]*?\bbegin\b([\s\S]*)\bend\b\s*$", text[prog.end():], re.I)
+            if kind == "FUNCTION" and m:
+                params = [p.split()[0].strip("`") for p in m.group(1).split(",") if p.strip()]
+                self.funcs[name.lower()] = {"name": name, "params": params, "body": m.group(2), "stmt": i}
+            self.add(i, f"CREATE {kind} {name}", f"Made {kind.lower()} {name}. It runs when it gets called.", kind="change")
+            return
         try:
             node = sqlglot.parse_one(text, read="mysql")
         except sqlglot.errors.SqlglotError:
@@ -471,6 +504,10 @@ class Stepper:
             inline_windows(node)
         if isinstance(node, exp.Query):
             self.run(text)  # real error? fail here, before any previews
+            for f in node.find_all(exp.Anonymous):  # SELECT getNth(2): step inside the function first
+                if f.name.lower() in self.funcs and all(isinstance(a, exp.Literal) for a in f.expressions):
+                    self.replay(self.funcs[f.name.lower()], [a.sql("mysql") for a in f.expressions])
+                    self.text = text
             self.query(node, [], "", i, raw=text)
             return
         if isinstance(node, exp.Insert) and isinstance(node.expression, exp.Query):
@@ -517,6 +554,58 @@ class Stepper:
         title = re.sub(r"\s+", " ", text)
         self.add(i, title[:80] + ("…" if len(title) > 80 else ""), msg, kind="change", tables=diff(before, after))
         return after
+
+    # --- a stored function, stepped through with real values ---
+
+    def replay(self, f, args, auto=False):
+        """Call a function the way LeetCode does: each SET with its values, then the RETURN query stepped
+        through like any other query (the parameters filled in), then the real call's result."""
+        i = f["stmt"]  # the steps point into the function's code, even when a later query calls it
+        call = f"{f['name']}({', '.join(args)})"
+        scope = f"inside {call}"
+        env = dict(zip((p.lower() for p in f["params"]), args))  # name -> SQL literal
+
+        def lit(x):
+            return "NULL" if x is None else str(x) if isinstance(x, (int, float)) else "'" + str(x).replace("'", "''") + "'"
+
+        def bind(sql):  # a parameter or variable wins over a column with the same name, as in MySQL
+            return sqlglot.parse_one(sql, read="mysql").transform(
+                lambda x: sqlglot.parse_one(env[x.name.lower()], read="mysql")
+                if isinstance(x, exp.Column) and not x.table and x.name.lower() in env else x)
+
+        def value(sql):
+            return self.run(f"SELECT {sql}")[1][0][0]
+        self.add(i, f"Call {call}", "LeetCode calls your function with its own test values." if auto else f"The query calls {call}.",
+                 kind="note", scope=scope, sql=call)
+        self.steps[-1]["detail"] = {"type": "set", "call": True, "auto": auto,
+                                    "vars": [{"name": p, "after": cell(value(a))} for p, a in zip(f["params"], args)]}
+        for part in split_semicolons(f["body"]):
+            d, st, r = re.match(r"declare\s+([\w\s,]+?)\s+\w+(?:\([^)]*\))?(?:\s+default\s+([\s\S]+))?$", part, re.I), \
+                re.match(r"set\s+`?(\w+)`?\s*=\s*([\s\S]+)$", part, re.I), re.match(r"return\b([\s\S]+)$", part, re.I)
+            if d:
+                for x in d.group(1).split(","):
+                    env[x.strip().lower()] = lit(value(bind(d.group(2)).sql("mysql"))) if d.group(2) else "NULL"
+            elif st:
+                name, before = st.group(1), env.get(st.group(1).lower(), "NULL")
+                env[name.lower()] = lit(value(bind(st.group(2)).sql("mysql")))
+                self.add(i, part, f"{name} changes.", kind="note", scope=scope, sql=part)
+                self.steps[-1]["detail"] = {"type": "set", "vars": [{"name": name, "before": cell(value(before)), "after": cell(value(env[name.lower()]))}]}
+            elif r:
+                node, text = bind(r.group(1)), self.text
+                if isinstance(node, exp.Subquery) and isinstance(node.unnest(), exp.Query):
+                    self.text = r.group(1)  # function names in the RETURN query point into this text
+                    self.query(node, [], scope, i)
+                    self.text = text
+                break
+            else:  # IF, loops, SELECT INTO ...: run it, but show only the answer
+                self.add(i, part[:60], "This part of the function isn't stepped through; the result below is the real answer.",
+                         kind="note", scope=scope)
+                break
+        if auto:  # a query that calls it shows the answer itself
+            cols, rows = self.run(f"SELECT {call}")
+            self.add(i, f"{call} returns", f"{call} returns {cell(rows[0][0]) if rows and rows[0][0] is not None else 'NULL'}. "
+                     f"To try another value, add a line like SELECT {f['name']}({', '.join('2' for _ in args)}); to your code.",
+                     kind="result", tables=[view(call, [call], rows)])
 
     # --- UPDATE / DELETE, one row at a time ---
 
@@ -933,6 +1022,8 @@ def run_all(setup, code):
     cur.execute(f"CREATE DATABASE `{db}`")
     cur.execute(f"USE `{db}`")
     cur.execute("SET SESSION max_execution_time = 5000")  # stop runaway SELECTs after 5s
+    # with binary logging on, MySQL 8 refuses CREATE FUNCTION without DETERMINISTIC; LeetCode doesn't
+    cur.execute("SET GLOBAL log_bin_trust_function_creators = 1")
     st = Stepper(cur)
     stmts = [{"text": s, "phase": "setup"} for s in split_sql(setup)] + \
             [{"text": s, "phase": "code"} for s in split_sql(code)]
@@ -955,6 +1046,13 @@ def run_all(setup, code):
             except pymysql.MySQLError as e:
                 st.add(i, "Error", f"MySQL error {e.args[0]}: {e.args[-1]}", kind="error")
                 break
+        called = " ".join(s["text"] for s in stmts if s["phase"] == "code" and not PROGRAM.match(s["text"]))
+        for f in st.funcs.values():
+            if not re.search(rf"\b{f['name']}\s*\(", called, re.I) and not any(x["kind"] == "error" for x in st.steps):
+                try:
+                    st.replay(f, ["1"] * len(f["params"]), auto=True)
+                except pymysql.MySQLError as e:
+                    st.add(f["stmt"], "Error", f"MySQL error {e.args[0]}: {e.args[-1]}", kind="error")
         if not any(s["phase"] == "code" for s in stmts):
             st.steps[-1]["explain"] += " Add some code in the second box to step through it."
     finally:
