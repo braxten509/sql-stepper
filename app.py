@@ -20,6 +20,7 @@ import sys
 import tarfile
 import threading
 import time
+import urllib.error
 import urllib.request
 import uuid
 import webbrowser
@@ -46,6 +47,18 @@ MAX_BODY = 200_000  # bytes of SQL per run
 RUNS_PER_MINUTE = int(os.environ.get("RUNS_PER_MINUTE", 120))  # per visitor (a class may share one school IP)
 TRUST_PROXY = bool(os.environ.get("TRUST_PROXY"))  # behind a proxy: the visitor is in X-Forwarded-For
 MAX_STATEMENTS = 2000
+# AI chat: any OpenAI-style chat API (OpenRouter by default). No key = no chat button.
+AI_KEY = os.environ.get("AI_API_KEY", "")
+AI_URL = os.environ.get("AI_URL", "https://openrouter.ai/api/v1/chat/completions")
+AI_MODEL = os.environ.get("AI_MODEL", "z-ai/glm-5.3-flash")
+# OpenRouter: only these US hosts, and only where chats are neither stored nor used for training
+AI_HOSTS = os.environ.get("AI_HOSTS", "fireworks,together,baseten,deepinfra").split(",")
+AI_NOTE = os.environ.get("AI_NOTE", "GLM 5.3 Flash on US servers that don't store or train on your chats.")
+CHATS_PER_10_MIN = int(os.environ.get("CHATS_PER_10_MIN", 20))  # per visitor
+CHATS_PER_DAY = int(os.environ.get("CHATS_PER_DAY", 60))  # per visitor; the key's own daily $ limit caps everyone
+# set on the website: chat only answers requests that came through the Cloudflare forwarder (which adds
+# this secret and the visitor's real IP), so the limits can't be skipped by calling Cloud Run directly
+PROXY_SECRET = os.environ.get("PROXY_SECRET", "")
 SLOTS = threading.BoundedSemaphore(int(os.environ.get("MAX_PARALLEL", 4)))  # runs at the same time
 MAX_ROWS = 300  # ponytail: display cap per table, raise if you step through big tables
 MAX_ROW_STEPS = 12  # per-row steps shown for one UPDATE/DELETE
@@ -1129,14 +1142,38 @@ RECENT = {}  # visitor -> times of their recent runs
 RECENT_LOCK = threading.Lock()
 
 
-def too_many(who):
+def too_many(who, limit=RUNS_PER_MINUTE, window=60):
     now = time.monotonic()
     with RECENT_LOCK:
-        if len(RECENT) > 10_000:  # ponytail: crude cleanup, fine for a class-sized site
-            RECENT.clear()
-        times = [t for t in RECENT.get(who, []) if now - t < 60] + [now]
+        if len(RECENT) > 10_000:  # forget visitors not seen for a day
+            for k in [k for k, v in RECENT.items() if now - v[-1] > 86400]:
+                del RECENT[k]
+        times = [t for t in RECENT.get(who, []) if now - t < window] + [now]
         RECENT[who] = times
-        return len(times) > RUNS_PER_MINUTE
+        return len(times) > limit
+
+
+CHAT_RULES = """You are the helper inside SQL Stepper, a website that steps through MySQL 8.0 code like a \
+debugger: clause by clause in the order MySQL runs it (FROM, JOIN, WHERE, GROUP BY, HAVING, SELECT, \
+DISTINCT, ORDER BY, LIMIT), showing the table at each step. Users are mostly students practicing \
+LeetCode-style SQL problems. You get their schema, their code, and the step they are looking at.
+Answer their question about it. Be short, plain, and friendly; use the actual table and column names \
+and values. Put SQL in ```sql blocks. If their code has a bug, say exactly what and show the fix. \
+Only help with SQL and databases."""
+
+
+def chat_prompt(data):
+    """The conversation for the AI: the rules, then what's on the user's screen, then the chat."""
+    c = data.get("context") or {}
+    # size caps keep the worst question to about 12k tokens in, so about $0.002 each
+    screen = f"Schema:\n```sql\n{str(c.get('setup', ''))[:12000]}\n```\nCode:\n```sql\n{str(c.get('code', ''))[:8000]}\n```"
+    if c.get("step"):
+        screen += f"\nThey are looking at this step: {str(c['step'])[:6000]}"
+    msgs = [{"role": "system", "content": CHAT_RULES + "\n\n" + screen}]
+    for m in (data.get("messages") or [])[-10:]:
+        if m.get("role") in ("user", "assistant"):
+            msgs.append({"role": m["role"], "content": str(m.get("content", ""))[:2000]})
+    return msgs
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -1148,15 +1185,19 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
+        if self.path == "/config":
+            return self.reply({"ai": bool(AI_KEY), "ai_note": AI_NOTE})
         self.send(200, (HERE / "index.html").read_bytes(), "text/html; charset=utf-8")
 
     def do_POST(self):
-        if self.path != "/run":
+        if self.path not in ("/run", "/chat"):
             return self.send(404, b"", "text/plain")
         size = int(self.headers.get("Content-Length") or 0)
         if size > MAX_BODY:
-            return self.reply({"error": "That's too much SQL for one run (the limit is about 200 KB)."})
+            return self.reply({"error": "That's too much for one request (the limit is about 200 KB)."})
         who = (self.headers.get("X-Forwarded-For", "").split(",")[0].strip() if TRUST_PROXY else "") or self.client_address[0]
+        if self.path == "/chat":
+            return self.chat(json.loads(self.rfile.read(size)), who)
         if too_many(who):
             return self.reply({"error": "Too many runs in the last minute. Wait a bit and try again."})
         if not SLOTS.acquire(timeout=RUN_SECONDS + 5):
@@ -1169,6 +1210,43 @@ class Handler(BaseHTTPRequestHandler):
         finally:
             SLOTS.release()
         self.reply(result)
+
+    def chat(self, data, who):
+        """Streams the AI's answer back as plain text while it's being written."""
+        if not AI_KEY:
+            return self.send(503, b"The AI chat isn't set up on this server.", "text/plain; charset=utf-8")
+        if PROXY_SECRET and not secrets.compare_digest(self.headers.get("X-Proxy-Secret", ""), PROXY_SECRET):
+            return self.send(403, b"Use the chat at sqlstepper.psbhr.com.", "text/plain; charset=utf-8")
+        if too_many("day " + who, CHATS_PER_DAY, 86400):
+            return self.send(429, b"You've reached today's limit for AI questions. It resets tomorrow.", "text/plain; charset=utf-8")
+        if too_many("chat " + who, CHATS_PER_10_MIN, 600):
+            return self.send(429, b"That's a lot of questions in a short time. Wait a few minutes and try again.", "text/plain; charset=utf-8")
+        req = urllib.request.Request(AI_URL, json.dumps({"model": AI_MODEL, "messages": chat_prompt(data), "stream": True, "max_tokens": 1000,
+                                                          "provider": {"only": AI_HOSTS, "zdr": True, "data_collection": "deny"}}).encode(),
+                                     {"Authorization": f"Bearer {AI_KEY}", "Content-Type": "application/json",
+                                      "HTTP-Referer": "https://sqlstepper.psbhr.com", "X-Title": "SQL Stepper"})
+        try:
+            upstream = urllib.request.urlopen(req, timeout=60)
+        except urllib.error.HTTPError as e:
+            print("chat error", e.code, e.read()[:300], flush=True)
+            msg = {402: "The AI chat has used up its budget for this month. It will be back next month.",
+                   429: "The AI is busy right now. Try again in a minute."}.get(e.code, "The AI couldn't answer right now. Try again in a bit.")
+            return self.send(502, msg.encode(), "text/plain; charset=utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+        with upstream:
+            for line in upstream:  # server-sent events: "data: {...}" per piece of text
+                if not line.startswith(b"data: ") or line.strip() == b"data: [DONE]":
+                    continue
+                try:
+                    piece = json.loads(line[6:])["choices"][0]["delta"].get("content") or ""
+                except (ValueError, KeyError, IndexError):
+                    continue
+                if piece:
+                    self.wfile.write(piece.encode())
+                    self.wfile.flush()
 
     def reply(self, result):
         self.send(200, json.dumps(result).encode(), "application/json")

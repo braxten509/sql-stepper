@@ -182,7 +182,8 @@ header { position: sticky; top: 0; z-index: 10; height: 52px; display: grid; gri
 .brand { white-space: nowrap; display: flex; align-items: center; gap: 10px; font-weight: 650; letter-spacing: -.01em; }
 .logo { width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; background: linear-gradient(135deg, var(--accent), #c084fc); color: #fff; }
 .brand small { margin-left: 8px; font-weight: 500; color: var(--muted); }
-#run { grid-column: 3; justify-self: end; }
+.actions { grid-column: 3; justify-self: end; display: flex; gap: 8px; }
+#ask.on { border-color: var(--accent); color: var(--accent); background: var(--accent-bg); }
 .spin { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 main { display: grid; grid-template-columns: minmax(300px, 30%) 1fr; align-items: start; }
@@ -217,6 +218,32 @@ textarea:focus-visible { outline: none; }
   .board-wrap { padding: 12px; }
 }
 @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+
+/* ---------- AI helper: a chat panel on the right that sees what's on screen ---------- */
+#chat { position: fixed; top: 52px; right: 0; bottom: 0; width: 400px; z-index: 9; display: flex; flex-direction: column; background: var(--panel); border-left: 1px solid var(--line); }
+#chat[hidden] { display: none; }
+body.chatting main { margin-right: 400px; }
+.chat-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 16px; border-bottom: 1px solid var(--line); }
+.chat-head span { flex: 1; font-size: 11.5px; line-height: 1.35; color: var(--muted); }
+#msgs { flex: 1; overflow: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.msg { font-size: 13.5px; line-height: 1.55; overflow-wrap: anywhere; }
+.msg.user { align-self: flex-end; max-width: 85%; padding: 8px 12px; border-radius: 12px 12px 4px 12px; background: var(--accent-bg); white-space: pre-wrap; }
+.msg.ai p { margin: 0 0 6px; }
+.msg.ai ul, .msg.ai ol { margin: 0 0 6px; padding-left: 20px; }
+.msg.ai code { font: 12.5px var(--mono); padding: 1px 5px; border-radius: 4px; background: var(--panel-2); }
+.msg.ai pre { margin: 4px 0 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); overflow: auto; font: 12.5px/1.55 var(--mono); }
+.msg.ai pre code { padding: 0; background: none; }
+.msg.err { color: var(--red); }
+.msg.typing > :last-child::after, .msg.typing:empty::after { content: "▍"; margin-left: 2px; color: var(--accent); animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.starters { margin-top: auto; display: flex; flex-direction: column; gap: 8px; }
+.starters p { margin: 0 0 4px; color: var(--muted); font-size: 13px; }
+.starters .btn { justify-content: flex-start; height: auto; padding: 8px 12px; text-align: left; }
+#chat-form { display: flex; align-items: flex-end; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); }
+#ask-in { flex: 1; resize: none; max-height: 140px; padding: 8px 10px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--panel-2); color: var(--text); font: 13.5px/1.45 var(--sans); }
+#ask-in:focus { outline: none; border-color: var(--accent); }
+@media (max-width: 1000px) { #chat { width: 100%; } body.chatting main { margin-right: 0; } }
+@media (prefers-reduced-motion: reduce) { .msg.typing > :last-child::after { animation: none; } }
 </style>
 </head>
 <body>
@@ -231,7 +258,10 @@ textarea:focus-visible { outline: none; }
     <button class="btn primary" id="next" aria-label="Next part">Next part ›</button>
     <button class="btn" id="end" aria-label="Skip to the end">Skip to end »</button>
   </div>
-  <button class="btn primary" id="run" title="Run (Ctrl+Enter)"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l14 8-14 8z"/></svg><span>Run</span></button>
+  <div class="actions">
+    <button class="btn" id="ask" hidden aria-label="Ask AI about your SQL"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4z"/></svg><span>Ask AI</span></button>
+    <button class="btn primary" id="run" title="Run (Ctrl+Enter)"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l14 8-14 8z"/></svg><span>Run</span></button>
+  </div>
 </header>
 <main>
   <section class="side">
@@ -249,6 +279,11 @@ textarea:focus-visible { outline: none; }
   </section>
 </main>
 
+<aside id="chat" hidden aria-label="AI helper">
+  <div class="chat-head"><b>AI helper</b><span id="chat-note"></span><button class="btn" id="chat-x" aria-label="Close the AI helper">✕</button></div>
+  <div id="msgs" aria-live="polite"></div>
+  <form id="chat-form"><textarea id="ask-in" rows="2" placeholder="Ask about your SQL..." aria-label="Your question"></textarea><button class="btn primary" id="send" aria-label="Send">↑</button></form>
+</aside>
 <dialog id="hid" aria-labelledby="hid-title"><div class="hid-head"><b id="hid-title"></b><button class="btn" id="hid-x" aria-label="Close">✕</button></div><div id="hid-body"></div></dialog>
 <script>
 const $ = s => document.querySelector(s);
@@ -1239,6 +1274,7 @@ $("#doc").onclick = e => {
   if (e.target.closest("[data-play]")) play();
 };
 document.addEventListener("keydown", e => {
+  if (e.target.closest("#chat")) return;
   if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); run(); return; }
   if (!MAIN.length || e.target.closest("textarea, input") || (e.key === " " && e.target.closest("button"))) return;
   const keys = { ArrowRight: () => go(cur + 1), ArrowLeft: () => go(cur - 1), ArrowDown: () => step(sub + 1), ArrowUp: () => step(sub - 1) };
@@ -1247,6 +1283,92 @@ document.addEventListener("keydown", e => {
 });
 let resizing;
 addEventListener("resize", () => { clearTimeout(resizing); resizing = setTimeout(() => MAIN.length && $("#board") && show({ instant: true }), 150); });
+
+// ---------- AI helper: a chat that sees the schema, the code and the step on screen ----------
+const CHAT = [];
+let asking = false;
+fetch("/config").then(r => r.json()).then(c => { if (c.ai) { $("#ask").hidden = false; $("#chat-note").textContent = c.ai_note; } }).catch(() => {});
+
+// a small, safe markdown: code blocks (SQL colored), `code`, **bold**, headings, lists
+const inline = s => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/^#{1,4} (.*)$/, "<b>$1</b>");
+function mdText(t) {
+  let out = "", list = null;
+  const close = () => { if (list) out += `</${list}>`; list = null; };
+  for (const l of t.split("\n")) {
+    const m = l.match(/^\s*(?:([-*•])|\d+[.)])\s+(.*)/);
+    if (!m) { close(); if (l.trim()) out += `<p>${inline(l)}</p>`; continue; }
+    const k = m[1] ? "ul" : "ol";
+    if (list !== k) { close(); out += `<${k}>`; list = k; }
+    out += `<li>${inline(m[2])}</li>`;
+  }
+  close();
+  return out;
+}
+function md(t) {
+  const p = t.split(/```(\w*)\n?([\s\S]*?)(?:```|$)/);  // text, language, code, text, ...
+  let out = "";
+  for (let i = 0; i < p.length; i += 3) {
+    out += mdText(p[i]);
+    if (i + 2 < p.length) out += `<pre><code>${/^(sql|mysql)?$/i.test(p[i + 1]) ? highlight(p[i + 2].replace(/\n$/, "")) : esc(p[i + 2])}</code></pre>`;
+  }
+  return out;
+}
+
+// what's on screen, in words, for the AI
+function onScreen() {
+  const c = { setup: $("#setup").value, code: $("#code").value };
+  if (!MAIN.length) return c;
+  const s = MAIN[cur], f = F[sub];
+  const tables = (s.tables || []).map(t => `Table ${t.name || ""} (${t.cols.join(", ")}):\n` +
+    t.rows.slice(0, 30).map(r => r.v.map(v => v === null ? "NULL" : v).join(" | ") + (r.m ? `   [${r.m}]` : "")).join("\n")).join("\n\n");
+  c.step = `part ${cur + 1} of ${MAIN.length}, "${s.title}"${s.scope ? ` (inside ${s.scope})` : ""}${f && f.label ? `, at "${f.label}"` : ""}. ` +
+    `${s.kind === "error" ? "MySQL ERROR: " : ""}${s.explain || ""}\n${tables}`;
+  return c;
+}
+
+function drawChat() {
+  const box = $("#msgs"), err = MAIN.some(m => m.kind === "error");
+  const starters = [err ? "What does this error mean, and how do I fix it?" : "Explain the step I'm looking at",
+    "Why doesn't my query give the right answer?", "Is there a simpler way to write this?"];
+  box.innerHTML = CHAT.length ? CHAT.map((m, i) => m.role === "user" ? `<div class="msg user">${esc(m.content)}</div>`
+      : `<div class="msg ai${m.err ? " err" : ""}${asking && i === CHAT.length - 1 ? " typing" : ""}">${m.err ? esc(m.content) : md(m.content)}</div>`).join("")
+    : `<div class="starters"><p>Ask anything about your SQL. I can see your schema, your code, and the step you're on.</p>${starters.map(q => `<button class="btn" data-q="${esc(q)}">${esc(q)}</button>`).join("")}</div>`;
+  box.scrollTop = box.scrollHeight;
+}
+
+async function ask(q) {
+  q = q.trim();
+  if (!q || asking) return;
+  asking = true; $("#send").disabled = true; $("#ask-in").value = "";
+  const a = { role: "assistant", content: "" };
+  CHAT.push({ role: "user", content: q }, a);
+  drawChat();
+  try {
+    const r = await fetch("/chat", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: CHAT.filter(m => m !== a && !m.err), context: onScreen() }) });
+    if (!r.ok) throw new Error(await r.text());
+    const read = r.body.getReader(), dec = new TextDecoder();
+    for (let x; !(x = await read.read()).done;) { a.content += dec.decode(x.value, { stream: true }); drawChat(); }
+    if (!a.content.trim()) throw new Error("The AI didn't answer. Try again.");
+  } catch (e) {
+    Object.assign(a, { content: e.message || "Couldn't reach the AI. Try again.", err: true });
+  }
+  asking = false; $("#send").disabled = false;
+  drawChat();
+}
+
+function toggleChat(open = $("#chat").hidden) {
+  $("#chat").hidden = !open;
+  document.body.classList.toggle("chatting", open);
+  $("#ask").classList.toggle("on", open);
+  if (open) { drawChat(); $("#ask-in").focus(); }
+  dispatchEvent(new Event("resize"));  // the board gets narrower or wider
+}
+$("#ask").onclick = () => toggleChat();
+$("#chat-x").onclick = () => toggleChat(false);
+$("#msgs").onclick = e => { const b = e.target.closest("[data-q]"); if (b) ask(b.dataset.q); };
+$("#chat-form").onsubmit = e => { e.preventDefault(); ask($("#ask-in").value); };
+$("#ask-in").onkeydown = e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(e.target.value); } };
 
 // ---------- run ----------
 const RUN_BTN = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l14 8-14 8z"/></svg><span>Run</span>`;
