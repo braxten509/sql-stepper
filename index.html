@@ -183,7 +183,10 @@ header { position: sticky; top: 0; z-index: 10; height: 52px; display: grid; gri
 .brand { white-space: nowrap; display: flex; align-items: center; gap: 10px; font-weight: 650; letter-spacing: -.01em; }
 .logo { width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; background: linear-gradient(135deg, var(--accent), #c084fc); color: #fff; }
 .brand small { margin-left: 8px; font-weight: 500; color: var(--muted); }
-.actions { grid-column: 3; justify-self: end; display: flex; gap: 8px; }
+.actions { grid-column: 3; justify-self: end; display: flex; align-items: center; gap: 8px; }
+.src { margin-right: 6px; font: 12px var(--sans); color: var(--muted); text-decoration: none; }
+.src:hover { color: var(--text); text-decoration: underline; }
+@media (max-width: 640px) { .src { display: none; } }
 #ask.on { border-color: var(--accent); color: var(--accent); background: var(--accent-bg); }
 .spin { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -275,6 +278,7 @@ body.chatting main { margin-right: 400px; }
     <button class="btn" id="end" aria-label="Skip to the end">Skip to end »</button>
   </div>
   <div class="actions">
+    <a class="src" href="https://github.com/braxten509/sql-stepper" target="_blank" rel="noopener">Source code</a>
     <button class="btn" id="ask" hidden aria-label="Ask AI about your SQL"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4z"/></svg><span>Ask AI</span></button>
     <button class="btn primary" id="run" title="Run (Ctrl+Enter)"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l14 8-14 8z"/></svg><span>Run</span></button>
   </div>
