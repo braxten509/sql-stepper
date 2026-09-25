@@ -1167,14 +1167,14 @@ grouped or aggregated is allowed (MySQL picks a value from the group). Only help
 def chat_prompt(data):
     """The conversation for the AI: the rules, then what's on the user's screen, then the chat."""
     c = data.get("context") or {}
-    # size caps keep the worst question to about 12k tokens in, so about $0.002 each
+    # size caps keep the worst question to about 25k tokens in, so under half a cent
     screen = f"Schema:\n```sql\n{str(c.get('setup', ''))[:12000]}\n```\nCode:\n```sql\n{str(c.get('code', ''))[:8000]}\n```"
     if c.get("step"):
         screen += f"\nThey are looking at this step: {str(c['step'])[:6000]}"
     msgs = [{"role": "system", "content": CHAT_RULES + "\n\n" + screen}]
     for m in (data.get("messages") or [])[-10:]:
         if m.get("role") in ("user", "assistant"):
-            msgs.append({"role": m["role"], "content": str(m.get("content", ""))[:2000]})
+            msgs.append({"role": m["role"], "content": str(m.get("content", ""))[:6000]})
     return msgs
 
 
@@ -1219,7 +1219,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(503, b"The AI chat isn't set up on this server.", "text/plain; charset=utf-8")
         if PROXY_SECRET and not secrets.compare_digest(self.headers.get("X-Proxy-Secret", ""), PROXY_SECRET):
             return self.send(403, b"Use the chat at sqlstepper.psbhr.com.", "text/plain; charset=utf-8")
-        req = urllib.request.Request(AI_URL, json.dumps({"model": AI_MODEL, "messages": chat_prompt(data), "stream": True, "max_tokens": 1000,
+        req = urllib.request.Request(AI_URL, json.dumps({"model": AI_MODEL, "messages": chat_prompt(data), "stream": True, "max_tokens": 2000,
+                                                          # little hidden "thinking": a long think used up the whole
+                                                          # answer allowance and left the reply empty
+                                                          "reasoning": {"effort": "low", "exclude": True},
                                                           "provider": {"only": AI_HOSTS, "zdr": True, "data_collection": "deny"}}).encode(),
                                      {"Authorization": f"Bearer {AI_KEY}", "Content-Type": "application/json",
                                       "HTTP-Referer": "https://sqlstepper.psbhr.com", "X-Title": "SQL Stepper"})
