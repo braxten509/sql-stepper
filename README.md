@@ -4,9 +4,11 @@ Paste MySQL, then step through it like a debugger: clause by clause in the order
 (FROM, JOIN, WHERE, GROUP BY, HAVING, SELECT, DISTINCT, ORDER BY, LIMIT), into CTEs and subqueries,
 and row by row for UPDATE and DELETE. Tables are shown at every step with changes highlighted.
 
-Your code is shown with a number on each part in the order MySQL runs it. The current part opens
-under its line and shows the tables. Keys: left/right move between parts, up/down step inside a
-part (animated; press again to fast-forward), Space plays, Ctrl+Enter runs.
+Your code stays pinned on top with a number on each part in the order MySQL runs it. Below it is one
+board where the same table is changed step by step: columns and values glide into place, a JOIN's
+other table sits beside it and its values fly in, GROUP BY rows fold together, removed rows fade out.
+Keys: left/right move between parts, up/down step (running on into the next part), Space plays,
+Ctrl+Enter runs.
 
 Run: `sql-stepper` (or `uv run app.py`). It opens http://127.0.0.1:8765.
 

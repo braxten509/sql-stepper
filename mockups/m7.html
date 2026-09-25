@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>One Table</title>
+<meta name="description" content="Code stays on top; one table below is reshaped step by step.">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="common.css">
+<style>
+.wrap { max-width: 940px; margin: 0 auto; padding: 0 16px 40px; }
+header { position: sticky; top: 0; z-index: 10; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.brand { font-weight: 650; }
+.dock { display: flex; align-items: center; gap: 10px; }
+.dock .btn { width: 96px; }
+#label { font-size: 12.5px; color: var(--muted); min-width: 84px; text-align: center; }
+#play { justify-self: end; }
+
+.card { border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); margin-top: 16px; overflow: hidden; }
+.lines { padding: 10px 0; }
+.line { display: grid; grid-template-columns: 64px 1fr; min-height: 28px; }
+.gut { display: flex; justify-content: flex-end; padding: 2px 12px 0 0; }
+.src { font: 14px/28px var(--mono); white-space: pre; transition: opacity .3s; }
+.line.dim .src { opacity: .38; }
+.line.on .src { background: color-mix(in srgb, var(--accent) 14%, transparent); border-radius: 4px; margin-right: 16px; padding-right: 8px; }
+.badge { display: inline-grid; place-items: center; min-width: 24px; height: 24px; border-radius: 99px; font: 700 11.5px var(--mono); border: 1.5px solid var(--line-2); color: var(--muted); background: var(--panel); cursor: pointer; transition: background .15s, box-shadow .15s; }
+.badge.done { border-color: color-mix(in srgb, var(--accent) 55%, transparent); color: var(--accent); }
+.badge.on { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 0 0 4px var(--accent-bg); }
+
+.sh { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 14px 18px; border-bottom: 1px solid var(--line); min-height: 58px; }
+.p-title { font: 700 14px var(--mono); color: var(--accent); }
+.brief { color: var(--text); font-size: 13.5px; line-height: 2; }
+.brief code { font: 13px var(--mono); background: var(--panel-2); border: 1px solid var(--line); padding: 2px 7px; border-radius: 6px; }
+.brief .sw { display: inline-flex; align-items: center; gap: 6px; margin-right: 14px; font: 12.5px var(--mono); }
+.brief .sw i { width: 11px; height: 11px; border-radius: 3px; }
+.brief .sw em { font-style: normal; color: var(--muted); }
+.dots { margin-left: auto; display: flex; gap: 5px; }
+.dots i { width: 7px; height: 7px; border-radius: 99px; background: var(--line-2); transition: background .2s; }
+.dots i.on { background: var(--accent); }
+.board-wrap { overflow-x: auto; padding: 18px; }
+#board { position: relative; transition: height .6s cubic-bezier(.2,.7,.2,1); }
+
+/* every box, header and cell is its own absolutely placed piece, so it can glide to its next spot */
+.it { position: absolute; left: 0; top: 0; box-sizing: border-box; white-space: nowrap; overflow: hidden;
+  transition: transform .65s cubic-bezier(.2,.7,.2,1), width .65s cubic-bezier(.2,.7,.2,1), height .65s cubic-bezier(.2,.7,.2,1), opacity .45s, background-color .35s, box-shadow .35s; }
+.box { z-index: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+.bt { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; font-size: 12px; color: var(--muted); }
+.bt b { font: 600 13px var(--mono); color: var(--text); }
+.bt span { margin-left: auto; }
+.th { z-index: 1; padding: 0 14px; line-height: 34px; font: 600 12px/34px var(--mono); color: var(--muted); background: var(--panel-2); border-bottom: 1px solid var(--line); }
+.td { z-index: 2; padding: 0 14px; font: 13px/34px var(--mono); border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--gc, transparent) 10%, transparent); }
+.td.last { border-bottom-color: transparent; }
+.rn { color: var(--faint); text-align: right; padding: 0 10px 0 0; box-shadow: inset 3px 0 var(--gc, transparent); }
+.use { background: var(--accent-bg); }
+.null { color: var(--faint); font-style: italic; }
+/* the flash is an overlay: animating background-color between these color formats glitches in Chrome */
+.flash::after { content: ""; position: absolute; inset: 0; background: var(--amber-bg); animation: flash 1.1s ease-out forwards; pointer-events: none; }
+@keyframes flash { to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .it, #board { transition: none; } .flash { animation: none; } }
+@media (max-width: 640px) { .brand, #label { display: none; } }
+</style>
+</head>
+<body>
+<header>
+  <span class="brand">SQL Stepper</span>
+  <div class="dock"><button class="btn" id="prev">‹ Back</button><span id="label"></span><button class="btn primary" id="next">Next ›</button></div>
+  <button class="btn" id="play">▶ Play</button>
+</header>
+<div class="wrap">
+  <div class="card"><div class="lines" id="code"></div></div>
+  <div class="card"><div class="sh" id="head"></div><div class="board-wrap"><div id="board"></div></div></div>
+</div>
+
+<script>
+// ponytail: one hard-coded query to try the layout; the real app would build these frames from /run
+const CODE = `SELECT parent.id,
+  CASE
+    WHEN parent.p_id IS NULL THEN 'Root'
+    WHEN COUNT(child.id) > 0 THEN 'Inner'
+    ELSE 'Leaf'
+  END AS type
+FROM Tree parent
+LEFT JOIN Tree child ON child.p_id = parent.id
+GROUP BY parent.id;`.split("\n");
+const PARTS = [  // execution order; `at` is the line its bubble sits on
+  { at: 6, title: "FROM Tree parent" },
+  { at: 7, title: "LEFT JOIN Tree child" },
+  { at: 8, title: "GROUP BY parent.id" },
+  { at: 0, title: "SELECT id, type" },
+];
+const GC = ["#8b9dff", "#f472b6", "#34d399", "#fbbf24", "#60a5fa"];
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const KW = /^(select|from|where|group|by|left|join|on|as|case|when|then|else|end|is|null)$/i;
+const hl = src => src.replace(/('[^']*')|(\b\d+\b)|([A-Za-z_]\w*)(?=\()|([A-Za-z_]\w*)|([^'\w]+)/g, (m, s, n, f, w) =>
+  s ? `<span class="s">${esc(s)}</span>` : n ? `<span class="n">${n}</span>` : f ? `<span class="f">${f}</span>`
+    : w && KW.test(w) ? `<span class="k">${w}</span>` : esc(m));
+const val = x => x === null ? `<span class="null">NULL</span>` : esc(x);
+
+// ---------- table layout: one item per box / header / cell ----------
+const W = { "#": 40, id: 110, p_id: 124, cid: 110, cp: 124, cnt: 170, type: 110 };
+const TH = 38, HH = 34, RH = 34;
+function table(id, x0, title, cols, rows, o = {}) {
+  const all = [{ k: "#" }, ...cols], xs = {};
+  let x = x0 + 1;
+  for (const c of all) { xs[c.k] = x; x += W[c.k]; }
+  let y = TH + HH, pg;
+  const ys = rows.map(r => { if (o.gaps && pg !== undefined && r.g !== pg) y += 8; pg = r.g; y += RH; return y - RH; });
+  const items = [{ k: `box:${id}`, x: x0, y: 0, w: x - x0 + 1, h: y + 1, cls: "box",
+    html: `<div class="bt"><b>${esc(title)}</b><span>${rows.length} rows</span></div>` }];
+  for (const c of all) items.push({ k: c.hk || `${id}:h:${c.k}`, x: xs[c.k], y: TH, w: W[c.k], h: HH,
+    cls: "th" + (o.use?.includes(c.k) ? " use" : ""), html: esc(c.label ?? "") });
+  rows.forEach((r, i) => {
+    const gc = r.g ? GC[(r.g - 1) % GC.length] : "", last = i === rows.length - 1 ? " last" : "";
+    items.push({ k: `${r.k}|#`, row: r.k, col: "#", x: xs["#"], y: ys[i], w: W["#"], h: RH, cls: "td rn" + last, gc, html: i + 1 });
+    for (const c of cols) items.push({ k: r.ck?.[c.k] || `${r.k}|${c.k}`, row: r.k, col: c.k, x: xs[c.k], y: ys[i], w: W[c.k], h: RH, gc,
+      cls: "td" + last + (o.use?.includes(c.k) ? " use" : ""), html: val(r.v[c.k]) });
+  });
+  return { items, w: x - x0 + 1 };
+}
+
+// ---------- the frames ----------
+const T = [[1, null], [2, 1], [3, 1], [4, 2], [5, 2]];
+const base = T.map(([id, p]) => ({ k: `t${id}`, v: { id, p_id: p } }));
+const kids = T.map(([id, p]) => ({ k: `c${id}`, v: { cid: id, cp: p } }));
+const P = (a, b) => [{ k: "id", label: a }, { k: "p_id", label: b }];
+const C = [{ k: "cid", label: "child.id", hk: "h:cid" }, { k: "cp", label: "child.p_id", hk: "h:cp" }];
+const joined = [  // parent rows paired with their child rows; t1b / t2b are the extra copies a second match makes
+  { k: "t1", c: "c2", g: 1 }, { k: "t1b", p: "t1", c: "c3", g: 1 }, { k: "t2", c: "c4", g: 2 }, { k: "t2b", p: "t2", c: "c5", g: 2 },
+  { k: "t3", g: 3 }, { k: "t4", g: 4 }, { k: "t5", g: 5 },
+].map(j => { const b = base.find(r => r.k === (j.p || j.k)), kid = kids.find(r => r.k === j.c);
+  return { k: j.k, g: j.g, v: { ...b.v, cid: kid ? kid.v.cid : null, cp: kid ? kid.v.cp : null }, ck: kid ? { cid: `${j.c}|cid`, cp: `${j.c}|cp` } : null }; });
+const LINK = { t1b: "t1", t2b: "t2" };
+const cnt = { t1: 2, t2: 2, t3: 0, t4: 0, t5: 0 }, type = { t1: "Root", t2: "Inner", t3: "Leaf", t4: "Leaf", t5: "Leaf" };
+const grouped = joined.filter(r => !LINK[r.k]).map(r => ({ ...r, v: { ...r.v, cnt: cnt[r.k], type: type[r.k] } }));
+const key = [1, 2, 3, 4, 5].map(g => `<span class="sw"><i style="background:${GC[g - 1]}"></i>Group ${g}<em>= ${g}</em></span>`).join("");
+
+const FRAMES = [
+  { part: 0, lines: [6, 6], brief: "Start with every row of Tree",
+    items: () => table("main", 0, "Tree", [{ k: "id", label: "id" }, { k: "p_id", label: "p_id" }], base).items },
+  { part: 0, lines: [6, 6], brief: "This copy of Tree is called <code>parent</code>",
+    items: () => table("main", 0, "parent", P("parent.id", "parent.p_id"), base).items },
+  { part: 1, lines: [7, 7], brief: "A second copy of Tree, called <code>child</code>",
+    items: () => { const m = table("main", 0, "parent", P("parent.id", "parent.p_id"), base);
+      return [...m.items, ...table("side", m.w + 48, "child", C, kids).items]; } },
+  { part: 1, lines: [7, 7], link: LINK, brief: "Pair rows where <code>child.p_id = parent.id</code>. No match → NULL",
+    items: () => table("main", 0, "parent + child", [...P("parent.id", "parent.p_id"), ...C], joined.map(r => ({ ...r, g: 0 }))).items },
+  { part: 2, lines: [8, 8], brief: key,
+    items: () => table("main", 0, "parent + child", [...P("parent.id", "parent.p_id"), ...C], joined, { gaps: true }).items },
+  { part: 2, lines: [8, 8], link: LINK, brief: "Each group becomes one row",
+    items: () => table("main", 0, "After GROUP BY", [...P("parent.id", "parent.p_id"), ...C, { k: "cnt", label: "COUNT(child.id)" }], grouped, { gaps: true }).items },
+  { part: 3, lines: [1, 5], brief: "Work out <code>type</code> for each row",
+    items: () => table("main", 0, "After GROUP BY", [...P("parent.id", "parent.p_id"), ...C, { k: "cnt", label: "COUNT(child.id)" }, { k: "type", label: "type" }],
+      grouped.map(r => ({ ...r, g: 0 })), { use: ["p_id", "cnt", "type"] }).items },
+  { part: 3, lines: [0, 5], brief: "Keep only the columns you asked for",
+    items: () => table("main", 0, "Result", [{ k: "id", label: "id" }, { k: "type", label: "type" }], grouped.map(r => ({ ...r, g: 0 }))).items },
+];
+
+// ---------- drawing: pieces with the same key glide; new ones fade in, gone ones fade out ----------
+const board = $("#board"), live = new Map();
+const put = (el, it, o = 1) => {
+  el.style.transform = `translate(${it.x}px, ${it.y}px)`;
+  el.style.width = it.w + "px"; el.style.height = it.h + "px"; el.style.opacity = o;
+};
+const byCell = items => new Map(items.filter(i => i.row).map(i => [`${i.row}|${i.col}`, i]));
+function draw(items, link, flash) {
+  const next = new Map(items.map(i => [i.k, i])), newCells = byCell(items);
+  const oldCells = byCell([...live.values()].map(v => v.it));
+  for (const [k, { el, it }] of live) {
+    if (next.has(k)) continue;
+    const to = it.row && link[it.row] && newCells.get(`${link[it.row]}|${it.col}`);  // merge into its partner row
+    el.style.zIndex = 0; put(el, to || it, 0);
+    setTimeout(() => el.remove(), 700);
+    live.delete(k);
+  }
+  for (const it of items) {
+    let rec = live.get(it.k);
+    if (!rec) {
+      const el = document.createElement("div");
+      const from = it.row && link[it.row] && oldCells.get(`${link[it.row]}|${it.col}`);  // split out of its partner row
+      el.style.transition = "none";
+      put(el, from || { ...it, y: it.y + (it.cls === "box" ? 0 : 6) }, from ? 1 : 0);
+      board.append(el); el.offsetWidth; el.style.transition = "";
+      rec = { el }; live.set(it.k, rec);
+      if (flash && it.cls.startsWith("td") && !it.cls.includes("rn") && !from) el.classList.add("flash");
+    } else if (rec.it.html !== it.html && !it.cls.includes("rn")) {
+      rec.el.classList.remove("flash"); rec.el.offsetWidth; rec.el.classList.add("flash");
+    }
+    const f = rec.el.classList.contains("flash");
+    rec.el.className = "it " + it.cls + (f ? " flash" : "");
+    if (rec.it?.html !== it.html) rec.el.innerHTML = it.html;
+    rec.el.style.setProperty("--gc", it.gc || "transparent");
+    put(rec.el, it);
+    rec.it = it;
+  }
+  board.style.height = Math.max(...items.filter(i => i.cls === "box").map(i => i.y + i.h)) + "px";
+}
+
+// ---------- navigation ----------
+let cur = -1, timer = null;
+function go(i) {
+  if (i < 0 || i >= FRAMES.length) return stop();
+  const f = FRAMES[i], back = i < cur;
+  draw(f.items(), (back ? FRAMES[cur] : f).link || {}, cur >= 0);  // going back, the frame we leave says who merges/splits
+  cur = i;
+  const p = f.part, inPart = FRAMES.map((x, j) => [x, j]).filter(([x]) => x.part === p);
+  $("#head").innerHTML = `<span class="p-title">${esc(PARTS[p].title)}</span><span class="brief">${f.brief}</span>
+    <span class="dots">${inPart.map(([, j]) => `<i class="${j === i ? "on" : ""}"></i>`).join("")}</span>`;
+  $("#code").innerHTML = CODE.map((src, li) => {
+    const on = li >= f.lines[0] && li <= f.lines[1];
+    const bub = PARTS.map((q, j) => q.at === li ? `<span class="badge ${j === p ? "on" : j < p ? "done" : ""}" data-p="${j}">${j + 1}</span>` : "").join("");
+    return `<div class="line ${on ? "on" : "dim"}"><div class="gut">${bub}</div><div class="src">${hl(src)}</div></div>`;
+  }).join("");
+  $("#label").textContent = `Step ${i + 1} of ${FRAMES.length}`;
+  $("#prev").disabled = i === 0; $("#next").disabled = i === FRAMES.length - 1;
+}
+function stop() { clearInterval(timer); timer = null; $("#play").textContent = "▶ Play"; }
+function play() {
+  if (timer) return stop();
+  if (cur === FRAMES.length - 1) go(0);
+  $("#play").textContent = "❚❚ Pause";
+  timer = setInterval(() => cur < FRAMES.length - 1 ? go(cur + 1) : stop(), 1700);
+}
+$("#prev").onclick = () => { stop(); go(cur - 1); };
+$("#next").onclick = () => { stop(); go(cur + 1); };
+$("#play").onclick = play;
+$("#code").onclick = e => { const b = e.target.closest("[data-p]"); if (b) { stop(); go(FRAMES.findIndex(f => f.part === +b.dataset.p)); } };
+document.addEventListener("keydown", e => {
+  if (e.key === "ArrowRight") { stop(); go(cur + 1); }
+  else if (e.key === "ArrowLeft") { stop(); go(cur - 1); }
+  else if (e.key === " ") { e.preventDefault(); play(); }
+});
+go(0);
+</script>
+</body>
+</html>

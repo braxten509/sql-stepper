@@ -50,36 +50,9 @@ mark.hl { background: var(--accent-bg); color: inherit; border-radius: 4px; box-
 .btn.primary { background: var(--accent); color: #fff; border-color: transparent; }
 .btn:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* tables */
-.tbl { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); overflow: hidden; box-shadow: var(--shadow); }
-.tbl-head { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--muted); }
-.tbl-head b { font: 600 13px var(--mono); color: var(--text); }
-.tbl-head .right { margin-left: auto; }
-.tbl-scroll { overflow: auto; max-height: 56vh; }
-table { border-collapse: separate; border-spacing: 0; width: 100%; font: 13px/1.4 var(--mono); }
-th { position: sticky; top: 0; background: var(--panel-2); text-align: left; font-weight: 600; font-size: 12px; color: var(--muted); padding: 7px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
-td { padding: 7px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; transition: background .2s, opacity .2s; }
-tr:last-child td { border-bottom: 0; }
 .null { color: var(--faint); font-style: italic; }
-td.rn, th.rn { width: 1%; color: var(--faint); padding-right: 4px; text-align: right; }
-tr.m-added td { background: var(--green-bg); } tr.m-added td.rn { box-shadow: inset 3px 0 var(--green); }
-tr.m-removed td, tr.m-out td { background: var(--red-bg); color: var(--red); text-decoration: line-through; }
-tr.m-removed td.rn, tr.m-out td.rn { box-shadow: inset 3px 0 var(--red); }
-tr.m-dropped td { opacity: .35; text-decoration: line-through; }
-tr.m-changed td.rn { box-shadow: inset 3px 0 var(--amber); }
-tr.m-match td, tr.m-current td { background: var(--blue-bg); }
-tr.m-match td.rn, tr.m-current td.rn { box-shadow: inset 3px 0 var(--blue); }
-td.ch { background: var(--amber-bg) !important; }
-td.ch s { color: var(--muted); margin-right: 6px; }
-tr.g td.rn { box-shadow: inset 3px 0 var(--gc); }
-tr.g.alt td { background: color-mix(in srgb, var(--gc) 8%, transparent); }
-tr.gstart td { border-top: 1px solid var(--line-2); }
-.empty-t { padding: 18px; text-align: center; color: var(--muted); font-size: 13px; }
-.fade { animation: fade .2s ease-out; }
-@keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .fade { animation: none; } td { transition: none; } }
-
-.doc { max-width: 1080px; margin: 0 auto; display: grid; gap: 18px; align-content: start; }
+.mono { font-family: var(--mono); }
+.doc { max-width: 1080px; margin: 0 auto; display: grid; gap: 16px; align-content: start; }
 
 /* numbered badges */
 .badge { display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 6px; border-radius: 99px; font: 700 11.5px var(--mono); border: 1.5px solid var(--line-2); color: var(--muted); background: var(--panel); cursor: pointer; transition: transform .12s, background .12s; }
@@ -89,127 +62,99 @@ tr.gstart td { border-top: 1px solid var(--line-2); }
 .badge[data-kind=change] { border-style: dashed; }
 .badge[data-kind=error] { border-color: var(--red); color: var(--red); }
 .badge.on[data-kind=error] { background: var(--red); color: #fff; box-shadow: 0 0 0 4px var(--red-bg); }
-.panel[data-kind=error] { border-left-color: var(--red); background: var(--red-bg); }
-.panel[data-kind=error] .p-title { color: var(--red); }
 
-/* code */
-.card { border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); overflow: hidden; }
-.card-head { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 600; color: var(--muted); }
-.lines { padding: 10px 0; }
-.line { display: grid; grid-template-columns: 96px 1fr; align-items: start; min-height: 30px; }
-.gut { display: flex; gap: 4px; justify-content: flex-end; padding: 3px 14px 0 8px; flex-wrap: wrap; }
-.src { font: 14.5px/30px var(--mono); white-space: pre-wrap; word-break: break-word; padding-right: 16px; }
+/* ---------- the code, pinned on top ---------- */
+.card { border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+.codebox { position: sticky; top: 64px; z-index: 5; max-height: 38vh; overflow: auto; padding: 8px 0; }
+.cb-start { display: flex; align-items: center; gap: 10px; padding: 4px 16px 6px 36px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.stmt + .stmt, .cb-start + .stmt { border-top: 1px dashed var(--line); padding-top: 6px; margin-top: 4px; }
+.line { display: grid; grid-template-columns: 72px 1fr; align-items: start; min-height: 28px; }
+.gut { display: flex; gap: 4px; justify-content: flex-end; padding: 2px 12px 0 8px; flex-wrap: wrap; }
+.src { font: 14px/28px var(--mono); white-space: pre-wrap; word-break: break-word; padding-right: 16px; }
 .line.dim .src { opacity: .4; }
-mark.hl { box-shadow: none; border-radius: 2px; background: color-mix(in srgb, var(--accent) 16%, transparent); }
-.mono { font-family: var(--mono); }
+mark.hl { color: inherit; border-radius: 2px; box-shadow: none; background: color-mix(in srgb, var(--accent) 16%, transparent); }
 u.focus { text-decoration: none; background: color-mix(in srgb, var(--amber) 22%, transparent); box-shadow: inset 0 -2px var(--amber); border-radius: 3px; }
 
-/* the inline panel under the running line */
-.panel { margin: 8px 16px 14px 96px; padding: 16px 18px 18px; border-left: 3px solid var(--accent); border-radius: 0 14px 14px 0; background: var(--panel-2); display: grid; gap: 14px; align-content: start; }
-.start-card .panel { margin-left: 16px; }
+/* ---------- the stage: what this part does, then the one board every table lives on ---------- */
+.stage-head { display: grid; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line); overflow: clip; }
+.stage[data-kind=error] .stage-head { background: var(--red-bg); }
+.stage[data-kind=error] .p-title { color: var(--red); }
 .p-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .p-title { font: 700 14px var(--mono); color: var(--accent); }
-.p-scope { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 99px; background: var(--panel); border: 1px solid var(--line); color: var(--muted); }
+.p-scope { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 99px; background: var(--panel-2); border: 1px solid var(--line); color: var(--muted); }
 .p-flow { margin-left: auto; font: 600 12px var(--mono); color: var(--muted); }
 .p-flow b { color: var(--text); }
-.p-explain { margin: 0; font-size: 15px; line-height: 1.6; max-width: 80ch; }
+.p-explain { font-size: 14.5px; line-height: 1.6; }
 .gkey { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; font: 13px var(--mono); color: var(--text); }
 .gkey b { color: var(--muted); font-weight: 600; margin-right: 2px; }
 .gkey em { font-style: normal; color: var(--muted); margin-left: 6px; }
 .gkey em::before { content: "= "; color: var(--faint); }
 .gkey i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 7px; vertical-align: -1px; }
-
-/* sub-stepper */
-.sub { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); }
+.sub { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .sub .btn { height: 30px; min-width: 30px; padding: 0 9px; }
-.sub .label { font-weight: 600; font-size: 13px; min-width: 150px; }
+.sub .label { font-weight: 600; font-size: 13px; }
 .sub .label small { font-weight: 400; color: var(--muted); margin-left: 6px; }
 .sub .dots { display: flex; gap: 4px; flex-wrap: wrap; margin-left: auto; max-width: 50%; }
 .sub .dots button { width: 9px; height: 9px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; background: var(--line-2); }
 .sub .dots button.done { background: color-mix(in srgb, var(--accent) 50%, var(--line-2)); }
 .sub .dots button.on { background: var(--accent); transform: scale(1.35); }
 .sub .dots button.end { border-radius: 3px; }
-
-/* focus card: the one thing happening right now */
-.focus-card { padding: 14px 16px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line-2); display: grid; gap: 8px; }
+.focus-card { padding: 12px 14px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line-2); display: grid; gap: 8px; }
 .chk { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font: 14px var(--mono); }
 .chk .expr { color: var(--muted); min-width: 0; }
-.val { display: inline-block; padding: 1px 8px; border-radius: 6px; background: var(--panel-2); border: 1px solid var(--line-2); font-weight: 600; }
+.val { display: inline-block; padding: 1px 8px; border-radius: 6px; background: var(--panel); border: 1px solid var(--line-2); font-weight: 600; }
 .arrow-r { color: var(--faint); }
 .t-yes { color: var(--green); font-weight: 700; } .t-no { color: var(--red); font-weight: 700; } .t-null { color: var(--amber); font-weight: 700; }
 .verdict { font: 600 14px var(--sans); padding-top: 4px; border-top: 1px dashed var(--line-2); }
 .verdict:first-child { border-top: 0; padding-top: 0; }
 .verdict.yes { color: var(--green); } .verdict.no { color: var(--red); }
-.whens { display: grid; grid-template-columns: auto auto 1fr auto; gap: 6px 14px; align-items: center; font: 14px var(--mono); }
+.whens { display: grid; grid-template-columns: auto auto auto 1fr; gap: 6px 14px; align-items: center; font: 14px var(--mono); }
 .when { display: contents; }
 .when .wm { font-weight: 700; color: var(--red); text-align: center; }
 .when.win .wm, .when.win .mono { color: var(--green); font-weight: 700; }
 .when.skip > * { color: var(--faint); }
 
-/* tables */
-.tables { display: grid; gap: 12px; }
-.tbl-scroll { max-height: 46vh; }
-th.hl, td.hl { background: var(--accent-bg) !important; }
-th.hl { color: var(--accent); }
-/* thin, see-through outlines: they trace the data without covering it */
-@property --ol { syntax: "<color>"; inherits: true; initial-value: transparent; }
-@property --rl { syntax: "<color>"; inherits: true; initial-value: transparent; }
-td.hl-in, th.hl-in { animation: ol-in .5s ease both; } td.hl-out, th.hl-out { animation: ol-out .5s ease both; }
-tr.hl-in { animation: rl-in .5s ease both; } tr.hl-out { animation: rl-out .5s ease both; }
-@keyframes ol-in { from { --ol: transparent; } } @keyframes ol-out { to { --ol: transparent; } }
-@keyframes rl-in { from { --rl: transparent; } } @keyframes rl-out { to { --rl: transparent; } }
-:root { --ol: color-mix(in srgb, var(--accent) 65%, var(--panel)); --rl: color-mix(in srgb, var(--blue) 65%, var(--panel)); }
-th.sel { color: var(--accent); }
-th.sel, td.sel, th.selw, td.selw { position: relative; }
-th.sel::before, td.sel::before, th.selw::before, td.selw::before { content: ""; position: absolute; z-index: 2; top: 0; bottom: -1px; left: 6px; width: calc(var(--w) + 16px); border: 0 solid var(--ol); border-width: 0 2.5px; pointer-events: none; }
-th.sel::before, th.selw::before { border-top-width: 2.5px; border-radius: 7px 7px 0 0; }
-tr:last-child td.sel::before, tr:last-child td.selw::before { bottom: 0; border-bottom-width: 2.5px; border-radius: 0 0 7px 7px; }
-td.empty { color: var(--faint); }
-/* the value being compared right now: an amber pill, matching the amber underline in the code */
-.hot { display: inline-block; margin: -2px -7px; padding: 2px 7px; border-radius: 6px; font-weight: 700; color: var(--text);
-  background: var(--amber-bg); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--amber) 70%, transparent); animation: hot-in .5s ease both; }
-@keyframes hot-in { from { background: transparent; box-shadow: inset 0 0 0 1.5px transparent; } }
-td.chkcell { width: 1%; text-align: center; font-weight: 700; }
-td.chkcell.yes { color: var(--green); } td.chkcell.no { color: var(--red); }
-/* the row being looked at gets an outline; every other row stays readable */
-/* the table has rounded corners (12px); the last row's corner cells match, so row outlines follow the curve */
-tbody tr:last-child td:first-child { border-bottom-left-radius: 11px; }
-tbody tr:last-child td:last-child { border-bottom-right-radius: 11px; }
-tr.m-dropped td { opacity: 1; color: var(--red); }
-/* the size is left un-important so the sweep animation can grow it */
-tr.m-strike td { color: var(--red) !important; background-color: transparent !important; background-image: linear-gradient(var(--red), var(--red)) !important; background-position: left center !important; background-repeat: no-repeat !important; background-size: 0% 2px; }
-tr.m-current td { background: transparent; box-shadow: inset 0 1.5px var(--rl), inset 0 -1.5px var(--rl); }
-tr.m-was td { box-shadow: inset 0 1.5px var(--rl), inset 0 -1.5px var(--rl); }
-tr.m-current td.rn { box-shadow: inset 1.5px 0 var(--rl), inset 0 1.5px var(--rl), inset 0 -1.5px var(--rl); }
-tr.m-was td.rn { box-shadow: inset 1.5px 0 var(--rl), inset 0 1.5px var(--rl), inset 0 -1.5px var(--rl); }
-tr.m-current td:last-child { box-shadow: inset -1.5px 0 var(--rl), inset 0 1.5px var(--rl), inset 0 -1.5px var(--rl); }
-tr.m-was td:last-child { box-shadow: inset -1.5px 0 var(--rl), inset 0 1.5px var(--rl), inset 0 -1.5px var(--rl); }
-/* the current group gets one outline around all of its rows */
-tr.g.m-grp td { --t: 0 0 transparent; --b: 0 0 transparent; box-shadow: inset 0 var(--t), inset 0 var(--b); }
-tr:not(.m-grp) + tr.m-grp td, tr.m-grp:first-child td { --t: 1.5px var(--rl); }
-tr.m-grp:has(+ tr:not(.m-grp)) td, tr.m-grp:last-child td { --b: -1.5px var(--rl); }
-tr.g.m-grp td.rn { box-shadow: inset 1.5px 0 var(--rl), inset 0 var(--t), inset 0 var(--b); }
-tr.g.m-grp td:last-child { box-shadow: inset -1.5px 0 var(--rl), inset 0 var(--t), inset 0 var(--b); }
-tr.g.m-gw td { --t: 0 0 transparent; --b: 0 0 transparent; box-shadow: inset 0 var(--t), inset 0 var(--b); }
-tr:not(.m-gw) + tr.m-gw td, tr.m-gw:first-child td { --t: 1.5px var(--rl); }
-tr.m-gw:has(+ tr:not(.m-gw)) td, tr.m-gw:last-child td { --b: -1.5px var(--rl); }
-tr.g.m-gw td.rn { box-shadow: inset 1.5px 0 var(--rl), inset 0 var(--t), inset 0 var(--b); }
-tr.g.m-gw td:last-child { box-shadow: inset -1.5px 0 var(--rl), inset 0 var(--t), inset 0 var(--b); }
-tr.m-new td { background: var(--green-bg); animation: pop 1.2s ease-out; }
-/* JOIN: the two inputs side by side, smaller */
-.pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; align-items: start; }
-.pair table { font-size: 11.5px; }
-.pair th { font-size: 11px; padding: 5px 10px; }
-.pair td { padding: 5px 10px; }
-.pair .tbl-scroll { max-height: 34vh; }
-/* a value flying from an input row into the combined row */
-.fly { position: fixed; z-index: 20; pointer-events: none; display: flex; align-items: center; padding: 0 10px; border-radius: 6px;
-  font: 600 12px/1 var(--mono); color: var(--text); background: color-mix(in srgb, var(--accent) 22%, var(--panel)); box-shadow: 0 4px 14px rgba(0,0,0,.25); white-space: nowrap; overflow: hidden; }
-.fly .hot { margin: 0; padding: 0; background: none; box-shadow: none; }
-tr.m-new td.rn { box-shadow: inset 3px 0 var(--green); }
-@keyframes pop { from { background: color-mix(in srgb, var(--green) 35%, transparent); } }
-.was { color: var(--muted); font-size: 11.5px; }
-.was.up { color: var(--green); } .was.down { color: var(--amber); }
+.board-wrap { overflow-x: auto; padding: 18px; }
+#board { position: relative; transition: height .6s cubic-bezier(.45, 0, .25, 1); }
+/* every box, header, cell and outline is its own piece, placed by position, so it can glide to its next spot */
+.it { position: absolute; left: 0; top: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.box { z-index: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+.bt { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; font-size: 12px; color: var(--muted); }
+.bt b { font: 600 13px var(--mono); color: var(--text); overflow: hidden; text-overflow: ellipsis; }
+.bt span { margin-left: auto; flex: none; }
+.more { position: absolute; bottom: 6px; left: 14px; font-size: 12px; color: var(--muted); }
+.th { z-index: 1; padding: 0 14px; font: 600 12px/34px var(--mono); color: var(--muted); background: var(--panel-2); border-bottom: 1px solid var(--line); }
+.th.rn { padding: 0 10px 0 0; text-align: right; }
+/* tints are all color-mix(): blending between these and plain rgba() colors glitches in Chrome */
+.td { z-index: 2; padding: 0 14px; font: 13px/34px var(--mono); border-bottom: 1px solid var(--line);
+  background-color: color-mix(in srgb, var(--gc, transparent) 10%, transparent); }
+.td.last { border-bottom-color: transparent; }
+.td.rn { color: var(--faint); text-align: right; padding: 0 10px 0 0; box-shadow: inset 3px 0 var(--gc, transparent); }
+.td.empty { color: var(--faint); }
+.td.ch { background-color: color-mix(in srgb, var(--amber) 16%, transparent); }
+.td.ch s { color: var(--muted); margin-right: 6px; }
+.td.ck { text-align: center; padding: 0; font-weight: 700; color: var(--faint); }
+.td.ck-yes { color: var(--green); } .td.ck-no { color: var(--red); }
+.td.r-no:not(.ck):not(.rn) { color: var(--red); text-decoration: line-through; }
+.td.r-skip:not(.ck):not(.rn) { color: var(--faint); }
+.td.r-rem { color: var(--red); text-decoration: line-through; background-color: color-mix(in srgb, var(--red) 11%, transparent); }
+.td.r-add { background-color: color-mix(in srgb, var(--green) 13%, transparent); }
+.td.r-add.rn { box-shadow: inset 3px 0 var(--green); }
+.td.r-chg.rn { box-shadow: inset 3px 0 var(--amber); }
+.td.r-match { background-color: color-mix(in srgb, var(--blue) 13%, transparent); }
+.pill { display: inline-block; margin: 0 -7px; padding: 0 7px; line-height: 24px; border-radius: 6px; font-weight: 700; color: var(--text);
+  background: color-mix(in srgb, var(--amber) 22%, transparent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--amber) 70%, transparent); }
+.ring { z-index: 3; pointer-events: none; border-radius: 8px; border: 2px solid color-mix(in srgb, var(--blue) 80%, transparent); }
+.ring.col { border-color: color-mix(in srgb, var(--accent) 75%, transparent); border-radius: 7px; }
+.ring.col.out { border-style: dashed; }
+.ring.frame { border: 2px dashed color-mix(in srgb, var(--amber) 85%, transparent); }  /* the rows a window function reads */
+.calc .chk + .chk { margin-top: 6px; }
+.calc.sub { margin: 4px 0 6px 22px; padding-left: 12px; border-left: 2px solid var(--line); font-size: 13px; }
+.ring.col.out, .ring.col.pick { border-color: color-mix(in srgb, var(--green) 85%, transparent); }  /* green: going into the result */
+/* a quick glow on a value that just arrived or changed (an overlay, so it never fights the row's own tint) */
+.flash::after { content: ""; position: absolute; inset: 0; background: color-mix(in srgb, var(--amber) 22%, transparent); animation: flash 1.1s ease-out var(--fd, 0s) both; pointer-events: none; }
+@keyframes flash { to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { #board { transition: none; } .flash::after { animation: none; opacity: 0; } }
 
 /* dock */
 .dock { display: flex; align-items: center; gap: 10px; min-width: 0; }
@@ -217,16 +162,7 @@ tr.m-new td.rn { box-shadow: inset 3px 0 var(--green); }
 .dock[hidden] { display: none; }
 .dock .label { font-size: 13px; min-width: 240px; max-width: 440px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dock .label b { font-family: var(--mono); }
-@media (max-width: 800px) { .line { grid-template-columns: 64px 1fr; } .panel { margin-left: 12px; } .sub .dots { display: none; } }
-::view-transition-group(*) { animation-duration: .8s; animation-delay: var(--vt-wait, 0s); animation-timing-function: cubic-bezier(.45, 0, .25, 1); }
-/* No fading and no overlap: what leaves shrinks away first, then what stays glides to its new spot
-   (already showing its new content), then what is new grows in. Timings are set per step in step(). */
-::view-transition-old(*) { display: none; }
-::view-transition-new(*) { animation: none; }
-::view-transition-old(*):only-child { display: block; animation: vt-shrink .6s cubic-bezier(.45, 0, .25, 1) both; }
-::view-transition-new(*):only-child { animation: vt-grow .6s var(--vt-grow, 0s) cubic-bezier(.45, 0, .25, 1) both; }
-@keyframes vt-shrink { to { transform: scale(0); } } @keyframes vt-grow { from { transform: scale(0); } }
-@media (prefers-reduced-motion: reduce) { tr.m-new td { animation: none; } }
+@media (max-width: 800px) { .line { grid-template-columns: 56px 1fr; } .sub .dots { display: none; } }
 
 /* ---------- app layout: editors on the left, the stepper on the right; the page itself scrolls ---------- */
 /* brand | part controls (centered) | Run */
@@ -239,9 +175,7 @@ header { position: sticky; top: 0; z-index: 10; height: 52px; display: grid; gri
 @keyframes spin { to { transform: rotate(360deg); } }
 main { display: grid; grid-template-columns: minmax(300px, 30%) 1fr; align-items: start; }
 .side { position: sticky; top: 52px; height: calc(100vh - 52px); display: grid; grid-template-rows: minmax(120px, 40%) 1fr; gap: 12px; padding: 14px 16px 16px; border-right: 1px solid var(--line); }
-.view { min-width: 0; padding: 20px 24px 40px; }
-.panel { scroll-margin: 70px 0 24px; }
-#doc { overflow-anchor: none; }
+.view { min-width: 0; padding: 12px 24px 40px; }
 
 /* ---------- editors ---------- */
 .ed-wrap { display: flex; flex-direction: column; min-height: 0; }
@@ -259,22 +193,16 @@ textarea:focus-visible { outline: none; }
 .doc-empty { min-height: 60vh; display: grid; place-items: center; text-align: center; color: var(--muted); padding: 24px; }
 .doc-empty .big { font-size: 16px; color: var(--text); font-weight: 600; margin: 12px 0 4px; }
 .error-box { max-width: 760px; margin: 40px auto; padding: 16px 18px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--red) 45%, transparent); background: var(--red-bg); }
-/* keep the header and the bottom bar above anything that is animating */
-/* the header stays on top and tracks its real spot every frame instead of gliding */
-::view-transition-group(vt-header) { z-index: 1; animation: none; }
-/* part change on a nearby line: snapshots don't animate their own position, they track the real
-   elements every frame, which ride on the sliding panel box (see go()) */
-:root.vt-ride::view-transition-group(*) { animation: none; }
 @media (max-width: 1000px) {
   main { grid-template-columns: 1fr; }
   .side { position: static; height: 560px; border-right: 0; border-bottom: 1px solid var(--line); }
-  .view { padding: 16px 12px; }
+  .view { padding: 12px; }
   .dock .label { min-width: 0; flex: 1; }
   .brand small { display: none; }
 }
 @media (max-width: 640px) {
   .brand-name, .dock .label { display: none; }
-  .view { min-width: 0; }
+  .board-wrap { padding: 12px; }
 }
 @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
 </style>
@@ -400,35 +328,6 @@ const truth = t => t === null || t === undefined ? `<span class="t-null">NULL �
   : +t ? `<span class="t-yes">true ✓</span>` : `<span class="t-no">false ✗</span>`;
 const short = (r, n = 3) => r.v.slice(0, n).map(x => x === null ? "NULL" : x).join(", ");
 
-// Table: rows [{v, m, old, g}], opts: {title, right, pre(row,i) -> [cls, html], preHead, col(c) -> "hl"|"empty"|""}
-function grid(cols, rows, o = {}) {
-  // ponytail: width from JetBrains Mono metrics (0.6em per char: 13px cells, 12px headers); a fallback font would be slightly off
-  const txt = x => x === null || x === undefined ? "NULL" : String(x);
-  const w = cols.map((c, k) => o.col && /sel/.test(o.col(k, -1)) ? Math.max(c.length * 7.2, ...rows.map(r => txt(r.v[k]).length * 7.8)) : 0);
-  const ws = k => w[k] ? ` style="--w:${w[k]}px"` : "";
-  const body = rows.map((r, i) => {
-    const cls = [r.m ? "m-" + r.m : ""];
-    let style = "";
-    if (r.g !== undefined) {
-      cls.push("g", r.g % 2 ? "" : "alt");
-      if (i && rows[i - 1].g !== r.g) cls.push("gstart");
-      style = ` style="--gc:${GC[(r.g - 1) % GC.length]}"`;
-    }
-    const pre = o.pre ? o.pre(r, i) : null;
-    const cells = r.v.map((x, c) => {
-      const mode = o.col ? o.col(c, i) : "";
-      if (/empty/.test(mode)) return `<td class="${mode}"${ws(c)}>…</td>`;
-      if (o.hot && o.hot(i, c)) return `<td class="${mode}"${ws(c)}><span class="hot">${cellHtml(x)}</span></td>`;
-      return r.old && c in r.old ? `<td class="ch ${mode}"><s>${cellHtml(r.old[c])}</s>${cellHtml(x)}</td>` : `<td class="${mode}"${ws(c)}>${cellHtml(x)}</td>`;
-    }).join("");
-    return `<tr class="${cls.join(" ")}"${style} data-rk="${esc(JSON.stringify(r.v))}"${r.a || ""}><td class="rn">${i + 1}</td>${pre ? `<td class="chkcell ${pre[0]}">${pre[1]}</td>` : ""}${cells}${o.post ? `<td>${o.post(r, i)}</td>` : ""}</tr>`;
-  }).join("");
-  const head = `<tr><th class="rn">#</th>${o.pre ? `<th>${o.preHead || ""}</th>` : ""}${cols.map((c, k) => `<th class="${o.col ? o.col(k, -1).replace("empty", "") : ""}"${ws(k)}>${esc(c)}</th>`).join("")}${o.post ? `<th>${o.postHead || ""}</th>` : ""}</tr>`;
-  return `<div class="tbl" data-vt="${esc(o.key || o.title || "")}">
-    <div class="tbl-head"><b>${esc(o.title || "")}</b><span class="right">${o.right ?? plural(rows.length, "row")}</span></div>
-    <div class="tbl-scroll"><table><thead>${head}</thead><tbody>${body}</tbody></table>${rows.length ? "" : `<div class="empty-t">No rows</div>`}</div></div>`;
-}
-const plain = rows => rows.map(r => ({ v: r.v, g: r.g }));
 
 // ---------- main steps (consecutive row-by-row steps become one "SET" part with inner steps) ----------
 let SC = null, MAIN = [];
@@ -458,26 +357,15 @@ function feeder(k) {
 }
 const keptRows = s => { const t = s.tables[0]; return t.rows.filter(r => !["dropped", "removed"].includes(r.m)); };
 
-// ---------- inner steps ("frames") for each kind of part ----------
-function frames(k) {
-  const s = MAIN[k], d = s.detail || {}, t = s.tables[0], prev = feeder(k);
-  if (s.rows) return s.rows.map(r => ({ label: r.title,  // the changed cells show old → new themselves
-    body: grid(r.tables[0].cols, r.tables[0].rows, { title: r.tables[0].name }) }));
-  if (d.type === "filter") return filterFrames(s, d, t);
-  if (d.type === "join") return joinFrames(s, d, t, prev);
-  if (d.type === "group") return groupFrames(s, d, t);
-  if (d.type === "select" && t && t.cols.length === d.cols.length) return selectFrames(s, d, t, prev);
-  if (/^ORDER BY/i.test(s.title) && prev) return orderFrames(s, t, prev);
-  if (/^(LIMIT|DISTINCT)/i.test(s.title) && prev) return cutFrames(s, t, prev);
-  return [{ label: "", card: "", body: s.tables.map(x => grid(x.cols, x.rows, { title: x.name + (x.badge ? ` · ${x.badge}` : ""), right: plural(liveRows(x), "row") })).join("") }];
-}
-
 // The actual values each check compared (same layout checkLines reads: truth, then left, then right).
 function checkVals(d, raw) {
   let i = 0; const out = new Set();
   d.checks.forEach(c => { i++; if ("left" in c) out.add(String(raw[i++])); if ("right" in c) out.add(String(raw[i++])); });
   return out;
 }
+// A calculation's steps, innermost first, each with this row's values: ROUND( 3.85 , 1) → 3.9
+const calcHtml = (steps, x) => steps.map(st => `<div class="chk"><span class="mono">${st.tpl.split(/__A(\d+)__/)
+  .map((p, j) => j % 2 ? v(x[st.args[+p]]) : esc(p)).join("")}</span><span class="arrow-r">→</span>${v(x[st.at])}</div>`).join("");
 function checkLines(d, raw, aliases = {}) {
   let i = 0;
   return d.checks.map(c => {
@@ -492,114 +380,8 @@ function checkLines(d, raw, aliases = {}) {
     else line = `<span class="expr">${esc(c.sql)}</span>`;
     const vals = "right" in c ? `${v(l)} ${esc(c.op)} ${v(r)}` : c.list ? `${v(l)} ${esc(c.rest.split(/\s/)[0])} [${c.list.map(v).join(" ")}]`
       : "left" in c ? `${v(l)} ${esc(c.rest)}` : `<span class="expr">${esc(c.sql)}</span>`;
-    return { t: tv, vals, html: `<div class="chk">${line}<span class="arrow-r">→</span>${truth(tv)}</div>` };
+    return { t: tv, vals, html: `<div class="chk">${line}<span class="arrow-r">→</span>${truth(tv)}</div>` + (c.calc ? `<div class="calc sub">${calcHtml(c.calc, raw)}</div>` : "") };
   });
-}
-
-function filterFrames(s, d, t) {
-  const aliases = (MAIN.find(x => x.stmt === s.stmt && x.detail?.type === "group")?.detail.aliases) || {};
-  const matchMode = t.rows.some(r => r.m === "match");
-  const kept = r => matchMode ? r.m === "match" : r.m !== "dropped";
-  const unit = d.groups ? "group" : "row", cond = d.checks.map(c => c.sql).join(` ${d.combine || ""} `);
-  // columns the condition compares (a HAVING alias like n counts as its aggregate, e.g. COUNT(*))
-  const aliased = Object.entries(aliases).filter(([, a]) => new RegExp(`\\b${a}\\b`).test(cond)).map(([e]) => e).join(" ");
-  const used = usedCols({ sql: `${cond} ${aliased}` }, t.cols);
-  const base = t.rows.map(r => ({ v: r.v, g: r.g }));
-  const n = Math.min(t.rows.length, 40);
-  const out = [{ label: `Every ${unit}`,
-    body: grid(t.cols, base, { key: "rows", title: `Every ${unit} going in`, pre: () => ["", "·"], preHead: "check" }) }];
-  for (let i = 0; i < n; i++) {
-    const r = t.rows[i], lines = checkLines(d, d.rows[i] || [], d.groups ? aliases : {}), compared = checkVals(d, d.rows[i] || []);
-    out.push({ label: `${unit[0].toUpperCase() + unit.slice(1)} ${i + 1} of ${t.rows.length}`, sub: short(r),
-      card: lines.map(l => l.html).join(""),
-      body: grid(t.cols, t.rows.map((x, j) => ({ v: x.v, g: x.g, m: j === i ? "current" : undefined })),
-        { key: "rows", title: `Checking ${unit}s`, hot: (ri, k) => ri === i && used.includes(k) && compared.has(String(t.rows[ri].v[k])), pre: (x, j) => j > i ? ["", "·"] : kept(t.rows[j]) ? ["yes", "✓"] : ["no", "✗"], preHead: "check" }) });
-  }
-  const keep = t.rows.filter(kept);
-  out.push({ label: "Result", end: true,
-    body: grid(t.cols, keep.map(r => ({ v: r.v })), { key: "rows", title: `After ${s.title.split(" ")[0]}` }) });
-  return out;
-}
-
-function joinFrames(s, d, t, prev) {
-  const L = d.left, left = prev ? keptRows(prev) : [], right = d.right || [];
-  const lCols = t.cols.slice(0, L), rCols = t.cols.slice(L);
-  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-  const used = new Set(), groups = left.map(lr => {
-    const idx = t.rows.map((r, j) => j).filter(j => !used.has(j) && same(t.rows[j].v.slice(0, L), lr.v));
-    idx.forEach(j => used.add(j));
-    return idx;
-  });
-  const onTxt = d.checks.map(c => c.sql).join(` ${d.combine || ""} `) || "every pair";
-  // columns the ON condition compares (qualified names first: in a self-join both sides share bare names)
-  const onCols = cols => { const q = cols.flatMap((c, k) => onTxt.includes(c) ? [k] : []); return q.length ? q : usedCols({ sql: onTxt }, cols); };
-  const lOn = onCols(lCols), rOn = onCols(rCols);
-  // both inputs, small and side by side; li = the current left row, ri = its matching right rows
-  const pair = (li = -1, ri = []) => `<div class="pair">${
-    grid(lCols, left.map((r, i) => ({ v: r.v, m: i === li ? "current" : undefined })), { key: "jl", title: "Left side (rows so far)", hot: (i, k) => i === li && lOn.includes(k) })}${
-    grid(rCols, right.map((v, i) => ({ v, m: ri.includes(i) ? "current" : undefined })), { key: "jr", title: `${d.table} (right side)`, hot: (i, k) => ri.includes(i) && rOn.includes(k) })}</div>`;
-  const out = [{ label: "Both sides",
-    body: pair() }];
-  const shown = new Set(), from = {};  // combined row -> [left row, right row or -1]
-  groups.slice(0, 40).forEach((idx, i) => {
-    const lr = left[i];
-    const matched = d.checks.length ? idx.filter(j => d.rows?.[j] && +d.rows[j][0]) : idx;  // no ON: every pair matches
-    const taken = new Set(), ri = [];
-    idx.forEach(j => {
-      const r = matched.includes(j) ? right.findIndex((v, k) => !taken.has(k) && same(v, t.rows[j].v.slice(L))) : -1;
-      if (r >= 0) { taken.add(r); ri.push(r); }
-      from[j] = [i, r];
-      shown.add(j);
-    });
-    let card = "";
-    if (matched.length) card += d.checks.length ? matched.map(j => checkLines(d, d.rows[j]).map(l => l.html).join("")).join("") : "";
-    else {
-      const c0 = d.checks[0], raw0 = idx.length ? d.rows[idx[0]] || [] : [];
-      if (c0 && "left" in c0 && raw0[1] === null)  // the left row's join key is NULL
-        card += `<div class="chk"><span class="expr">${esc(c0.left)}</span> ${v(null)}<span class="arrow-r">→</span><span class="t-null">NULL never matches</span></div>`;
-      card += d.side === "LEFT" ? `<div class="verdict yes">No match → kept with NULLs</div>` : `<div class="verdict no">No match → dropped</div>`;
-    }
-    const order = [...shown].sort((a, b) => a - b);
-    out.push({ label: `Left row ${i + 1} of ${left.length}`, sub: short(lr), card,
-      body: pair(i, ri) + grid(t.cols, order.map(j => ({ v: t.rows[j].v, m: idx.includes(j) ? "new" : undefined,
-        a: idx.includes(j) ? ` data-l="${from[j][0]}" data-r="${from[j][1]}" data-n="${L}"` : "" })), { key: "out", title: "Combined rows so far", right: plural(order.length, "row") }) });
-  });
-  out.push({ label: "Result", end: true,     body: grid(t.cols, t.rows.map(r => ({ v: r.v })), { key: "out", title: "After the JOIN" }) });
-  return out;
-}
-
-// JOIN merge: copies of the current left row's values and its matching right row's values fly
-// down into their columns of the combined row(s) they become; then the real row shows under them.
-async function flyMerge() {
-  const p = document.querySelector(".panel"), dst = p ? [...p.querySelectorAll('.tbl[data-vt="out"] tr[data-l]')] : [];
-  if (!dst.length) return;
-  const src = (key, i) => [...(p.querySelector(`.tbl[data-vt="${key}"] tbody`)?.children[i]?.children || [])].slice(1);
-  // first bring the source rows and the new rows into view together (the new rows win if both don't fit)
-  const top = Math.min(...dst.map(tr => +tr.dataset.l).map(i => src("jl", i)[0]?.getBoundingClientRect().top ?? Infinity)) - 60;
-  const bottom = dst.at(-1).getBoundingClientRect().bottom + 20, room = innerHeight - 52;
-  const dy = bottom > innerHeight ? bottom - innerHeight : top < 52 && bottom - top <= room ? top - 52 : 0;
-  if (Math.abs(dy) > 2) {
-    scrollBy({ top: dy, behavior: rush ? "instant" : "smooth" });
-    await new Promise(r => { addEventListener("scrollend", r, { once: true }); setTimeout(r, 900); });
-  }
-  const D = 900, opt = { duration: D, easing: "cubic-bezier(.45, 0, .25, 1)" }, jobs = [];
-  dst.forEach(tr => {
-    const cells = [...tr.children].slice(1), n = +tr.dataset.n;
-    const pairs = src("jl", +tr.dataset.l).map((td, k) => [td, cells[k]]);
-    if (+tr.dataset.r >= 0) pairs.push(...src("jr", +tr.dataset.r).map((td, k) => [td, cells[n + k]]));
-    tr.style.opacity = "";
-    jobs.push(quick(tr.animate({ opacity: [0, 0, 1] }, { duration: D + 250, fill: "backwards" })).finished);
-    pairs.forEach(([a, b]) => {
-      if (!a || !b) return;
-      const r0 = a.getBoundingClientRect(), r1 = b.getBoundingClientRect(), g = document.createElement("div");
-      g.className = "fly"; g.innerHTML = a.innerHTML;
-      Object.assign(g.style, { left: r0.left + "px", top: r0.top + "px", width: r0.width + "px", height: r0.height + "px" });
-      document.body.append(g);
-      const a1 = quick(g.animate({ transform: ["none", `translate(${r1.left - r0.left}px, ${r1.top - r0.top}px)`], width: [r0.width + "px", r1.width + "px"], height: [r0.height + "px", r1.height + "px"] }, { ...opt, fill: "forwards" }));
-      jobs.push(a1.finished.then(() => quick(g.animate({ opacity: [1, 0] }, { duration: 250, fill: "forwards" })).finished).finally(() => g.remove()));
-    });
-  });
-  return Promise.allSettled(jobs);
 }
 
 // The line under a part's title: a visual when there is one, else a few words. The animations
@@ -662,71 +444,584 @@ function usedCols(c, cols) {
   return cols.map((x, k) => x === c.sql || words.has(full(x)) || words.has(bare(x)) || (/\W/.test(x) && c.sql.includes(x)) ? k : -1).filter(k => k >= 0);
 }
 
-function selectFrames(s, d, t, prev) {
-  const text = SC.statements[s.stmt].text, out = [];
-  let inRows = prev ? keptRows(prev) : [], inCols = prev ? prev.tables[0].cols : [];
-  // grouped query: read from the GROUP BY table (it has every aggregate), keeping only groups that got this far
-  const grp = MAIN.find(x => x.stmt === s.stmt && x.scope === s.scope && x.detail?.type === "group")?.detail;
-  if (grp && prev) {
-    const nk = grp.keys.length, key = r => JSON.stringify(r.v.slice(0, nk)), live = new Set(inRows.map(key));
-    inCols = grp.summary.cols; inRows = grp.summary.rows.filter(r => live.has(key(r)));
-  }
-  const place = sql => { const r = locate(text, sql, !!s.scope); return r; };
-  d.cols.forEach((c, ci) => {
-    // columns after this one are still empty; this column is filled for rows up to `filled`
-    const used = usedCols(c, inCols), sameRows = inRows.length === t.rows.length;
-    const input = filled => prev ? grid(inCols, inRows.map((r, i) => ({ v: r.v, m: sameRows && i === filled && c.case ? "current" : undefined })),
-      { key: "in", title: "Input", col: k => used.includes(k) ? "sel" : "", hot: (ri, k) => c.case && sameRows && ri === filled && used.includes(k) }) : "";
-    const upto = filled => input(filled) + grid(t.cols, t.rows.map((r, i) => ({ v: r.v, m: i === filled && c.case ? "current" : undefined })), { key: "out", title: "Building the output",
-      col: (k, i) => k === ci ? (i > filled ? "empty sel" : "sel") : k > ci ? "empty" : "" });
-    out.push({ label: `Column ${ci + 1} of ${d.cols.length}`, sub: c.name, under: place(c.sql),
-      card: c.name !== c.sql && !c.star ? `<div class="chk"><span class="expr">${esc(c.name)}</span><b>=</b><span class="mono">${esc(c.sql.length > 90 ? c.sql.slice(0, 90) + "…" : c.sql)}</span></div>` : "",
-      body: upto(c.case && d.case_rows ? -1 : Infinity) });
-    if (c.case && d.case_rows) {
-        t.rows.slice(0, 40).forEach((r, ri) => {
-        const raw = d.case_rows[ri] || [];
-        const tv = c.case.branches.map(b => raw[b.offset]);
-        const win = tv.findIndex(x => +x === 1);
-        const unq = x => x.replace(/^'|'$/g, "");
-        const lines = c.case.branches.map((b, bi) => {
-          const skipped = win >= 0 && bi > win;
-          const got = skipped ? "" : checkLines(b, raw.slice(b.offset + 1));
-          const vals = skipped ? `<span class="expr">skipped</span>` : got.map(x => x.vals).join(` <b>${b.combine || ""}</b> `);
-          const mark = skipped ? "·" : +tv[bi] ? "✓" : "✗";
-          return `<div class="when ${skipped ? "skip" : bi === win ? "win" : ""}"><span class="wm">${mark}</span><span class="mono">WHEN ${esc(c.case.operand ? `${c.case.operand} = ${b.when}` : b.when)}</span><span class="wv">${vals}</span><span class="wt">${bi === win ? `→ ${v(unq(b.then))}` : ""}</span></div>`;
-        }).join("") + (c.case.else !== undefined && c.case.else !== null ? `<div class="when ${win < 0 ? "win" : "skip"}"><span class="wm">${win < 0 ? "✓" : "·"}</span><span class="mono">ELSE</span><span class="wv">${win < 0 ? `<span class="expr">nothing matched</span>` : `<span class="expr">skipped</span>`}</span><span class="wt">${win < 0 ? `→ ${v(unq(c.case.else))}` : ""}</span></div>` : "");
-        const b = win >= 0 ? c.case.branches[win] : null;
-        out.push({ label: `Row ${ri + 1} of ${t.rows.length}`, sub: `${c.name} for row ${ri + 1}`,
-          under: b ? place(`WHEN ${b.when} THEN ${b.then}`) || place(b.when) : place(`ELSE ${c.case.else}`),
-          card: `<div class="whens">${lines}</div>`,
-          body: upto(ri) });
-      });
-    }
+// ---------- the board's model ----------
+// Each part is shown as the same table being changed, not as new tables. A "state" is a table the way a part
+// leaves it: { id, title, cols: [{k, label}], rows: [{k, v, g}] }. Every row and column keeps its key k from
+// part to part, so the board can glide each value from where it was to where it is now.
+let UID = 0, PF = [], PR = [];  // PF[k]: part k's inner steps; PR[k]: [origin, copy] piece pairs (splits, merges, copies)
+const uid = p => `${p}${++UID}`;
+const same = (a, b) => String(a) === String(b);
+const sameRow = (a, b) => a.length === b.length && a.every((x, i) => same(x, b[i]));
+// a column's name without its table (e.id and id are the same column); expressions keep their full text
+const bare = l => /^[\w`$]+(\.[\w`$]+)?$/.test(l) ? l.replace(/`/g, "").split(".").pop().toLowerCase() : l.toLowerCase();
+const tagged = names => { const n = {}; return names.map(x => `${x}#${n[x] = (n[x] || 0) + 1}`); };  // a self-join has two "id"s
+const cv = (x, c = "") => ({ h: x === undefined ? "…" : cellHtml(x), t: x === null ? "NULL" : x === undefined ? "…" : String(x), c: x === undefined ? "empty " + c : c });
+const EMPTY = cv(undefined);
+const hot = x => ({ ...cv(x), h: `<span class="pill">${cellHtml(x)}</span>` });
+const withOld = (r, x, c) => r.old && c in r.old ? { h: `<s>${cellHtml(r.old[c])}</s>${cellHtml(x)}`, t: `${r.old[c]} ${x}`, c: "ch" } : cv(x);
+const MARK = { dropped: "r-no", removed: "r-rem", added: "r-add", changed: "r-chg", match: "r-match" };
+
+// Line a stage's rows up with the table it came from: matching columns keep their keys, and each row takes
+// the key of the incoming row with the same values (or the same spot, when an UPDATE changed its values).
+function adopt(labels, vals, input, title) {
+  const it = input ? tagged(input.cols.map(c => bare(c.label))) : [];
+  const map = tagged(labels.map(bare)).map(t => it.indexOf(t));
+  const cols = labels.map((label, i) => ({ label, k: map[i] >= 0 ? input.cols[map[i]].k : uid("c") }));
+  const shared = map.flatMap((m, i) => m >= 0 ? [[i, m]] : []), used = new Set();
+  const take = j => { used.add(j); return input.rows[j].k; };
+  const rows = vals.map(v => {
+    const j = shared.length ? input.rows.findIndex((r, n) => !used.has(n) && shared.every(([i, m]) => same(r.v[m], v[i]))) : -1;
+    return { k: j >= 0 ? take(j) : null, v };
   });
-  out.push({ label: "Result", end: true,     body: grid(t.cols, t.rows.map(r => ({ v: r.v })), { key: "out", title: "After SELECT" }) });
-  return out;
+  if (input && vals.length === input.rows.length) rows.forEach((r, i) => { if (!r.k && !used.has(i)) r.k = take(i); });
+  rows.forEach(r => { r.k ||= uid("r"); });
+  return { id: input?.id || uid("t"), title: title ?? input?.title ?? "", cols, rows };
+}
+// A state as a board table. o.cols / o.cells(row, i) replace the columns and cells, o.rc(row, i) adds a row class.
+function T(st, o = {}) {
+  return { id: st.id, title: o.title ?? st.title, right: o.right, cols: o.cols || st.cols,
+    rows: st.rows.map((r, i) => ({ k: r.k, c: [MARK[r.m], o.rc?.(r, i)].filter(Boolean).join(" "),
+      gc: r.g ? GC[(r.g - 1) % GC.length] : "", gap: o.gaps && i > 0 && r.g !== st.rows[i - 1].g,
+      cells: o.cells ? o.cells(r, i) : r.v.map((x, c) => withOld(r, x, c)) })) };
+}
+const one = (st, extra = {}) => ({ tables: st ? [T(st)] : [], ...extra });
+const nameOf = (t, fallback) => t.name === "Rows at this stage" ? fallback : t.name;
+
+// ---------- every part's inner steps, worked out once per run, in order ----------
+function prepare() {
+  UID = 0; PF = []; PR = [];
+  const outs = [], known = {};  // known: each named table as it stands now (starting tables, then after changes)
+  MAIN.forEach((s, k) => {
+    const p = feeder(k), input = p ? outs[MAIN.indexOf(p)] : fromKnown(s, known);
+    let r;
+    try { r = part(s, k, input, known); } catch (e) { console.error(e); r = plainPart(s, input, known); }
+    PF[k] = r.frames; PR[k] = r.rel || []; outs[k] = r.out;
+    const name = (/^(?:CTE|derived table) (\S+)/.exec(s.scope) || [])[1];
+    if (name && s.kind === "result" && r.out) known[name.toLowerCase()] = r.out;  // FROM x picks up where the CTE ended
+  });
+}
+// The first part of a query starts from the named table as it stands (FROM emp, UPDATE emp ...).
+function fromKnown(s, known) {
+  const text = s.stmt === null ? "" : SC.statements[s.stmt].text;
+  const m = /^FROM\s+`?([\w$]+)/i.exec(s.title) || (/row by row/.test(s.scope) && /^\s*(?:UPDATE|DELETE\s+FROM)\s+`?([\w$]+)/i.exec(text))
+    || (s.kind === "change" && s.tables[0] && [0, s.tables[0].name]);
+  return m ? known[m[1].toLowerCase()] || null : null;
+}
+function part(s, k, input, known) {
+  const d = s.detail || {};
+  if (s.kind === "start") return startPart(s, known);
+  if (!s.tables.length) return { frames: [{ view: one(input) }], out: input };  // an error or a note: the table stays as it was
+  if (s.rows) return rowsPart(s, input);
+  if (s.kind === "change") return changePart(s, input, known);
+  if (d.type === "filter") return filterPart(s, d, input, k);
+  if (d.type === "join" && input) return joinPart(s, d, input, k, known);
+  if (d.type === "group" && d.summary) return groupPart(s, d, input);
+  if (d.type === "select" && input && s.tables[0].cols.length === d.cols.length) return selectPart(s, d, input, k);
+  if (/^ORDER BY/i.test(s.title) && input) return orderPart(s, input);
+  if (/^(LIMIT|DISTINCT)/i.test(s.title) && input) return cutPart(s, input);
+  return plainPart(s, input, known);
 }
 
-function matchPositions(rows, pool) {  // where did each row of `rows` sit in `pool`?
-  const used = new Set();
-  return rows.map(r => { const j = pool.findIndex((p, k) => !used.has(k) && JSON.stringify(p.v) === JSON.stringify(r.v)); used.add(j); return j; });
+function startPart(s, known) {
+  const sts = s.tables.map(t => {
+    const tags = tagged(t.cols.map(bare));
+    const st = { id: `t:${t.name}`, title: t.name, cols: t.cols.map((label, i) => ({ label, k: `${t.name}.${tags[i]}` })),
+      rows: t.rows.map(r => ({ k: uid("r"), v: r.v })) };
+    return known[t.name.toLowerCase()] = st;
+  });
+  return { frames: [{ view: { tables: sts.map(st => T(st)) } }], out: sts[0] || null };
 }
-function orderFrames(s, t, prev) {
-  const before = keptRows(prev), was = matchPositions(t.rows, before);
-  return [
-    { label: "Before sorting",
-      body: grid(prev.tables[0].cols, before.map(r => ({ v: r.v })), { key: "rows", title: "Going in" }) },
-    { label: "After sorting", end: true,       body: grid(t.cols, t.rows.map(r => ({ v: r.v })), { key: "rows", title: "After ORDER BY", postHead: "moved",
-        post: (r, i) => was[i] < 0 ? "" : was[i] === i ? `<span class="was">stayed</span>` : `<span class="was ${was[i] > i ? "up" : "down"}">was #${was[i] + 1} ${was[i] > i ? "↑" : "↓"}</span>` }) }];
+
+// FROM, UNION, results and anything without its own steps: the table, lined up with where it came from.
+function plainPart(s, input, known) {
+  const from = /^FROM\s+`?([\w$]+)`?(?:\s+(?:AS\s+)?`?([\w$]+)`?)?/i.exec(s.title);
+  const sts = s.tables.map((t, i) => {
+    const base = i === 0 ? input : known[t.name.toLowerCase()];
+    const st = adopt(t.cols, t.rows.map(r => r.v), base, from ? from[2] || from[1] : nameOf(t, base?.title || "Rows"));
+    st.rows.forEach((r, n) => { r.m = t.rows[n].m; r.old = t.rows[n].old; });
+    return st;
+  });
+  return { frames: [{ view: { tables: sts.map(st => T(st)) } }], out: sts[0] ? clean(sts[0]) : input };
 }
-function cutFrames(s, t, prev) {
-  const before = keptRows(prev), pos = new Set(matchPositions(t.rows, before));
-  return [
-    { label: "Before",
-      body: grid(prev.tables[0].cols, before.map((r, i) => ({ v: r.v, m: pos.has(i) ? undefined : "dropped" })), { key: "rows", title: "Going in" }) },
-    { label: "After", end: true, 
-      body: grid(t.cols, t.rows.map(r => ({ v: r.v })), { key: "rows", title: `After ${s.title.split(" ")[0]}` }) }];
+const clean = st => ({ ...st, rows: st.rows.filter(r => !["dropped", "removed"].includes(r.m)).map(r => ({ k: r.k, v: r.v, g: r.g })) });
+
+// INSERT / UPDATE / DELETE result: marks first, then removed rows leave.
+function changePart(s, input, known) {
+  const sts = s.tables.map((t, i) => {
+    const base = i === 0 && input ? input : known[t.name.toLowerCase()];
+    const st = adopt(t.cols, t.rows.map(r => r.v), base, t.name);
+    st.id = base?.id || `t:${t.name}`;
+    st.rows.forEach((r, n) => { r.m = t.rows[n].m; r.old = t.rows[n].old; });
+    known[t.name.toLowerCase()] = clean(st);
+    return st;
+  });
+  const frames = [{ label: "What changed", view: { tables: sts.map(st => T(st)) } }];
+  if (sts.some(st => st.rows.some(r => r.m === "removed")))
+    frames.push({ label: "After", end: true, view: { tables: sts.map(st => T(clean(st))) } });
+  return { frames, out: sts[0] ? clean(sts[0]) : input };
 }
+
+// UPDATE / DELETE, one matched row at a time.
+function rowsPart(s, input) {
+  let st = input;
+  const frames = s.rows.map(r => {
+    const t = r.tables[0];
+    st = adopt(t.cols, t.rows.map(x => x.v), input, t.name);
+    const gone = /^DELETE/i.test(s.scope) ? "removed" : undefined;  // the row DELETE is on is being removed
+    st.rows.forEach((x, n) => { x.cur = t.rows[n].m === "current"; x.m = x.cur ? gone : t.rows[n].m; x.old = t.rows[n].old; });
+    return { label: r.title, view: one(st, { rings: [{ k: "ring:row", table: st.id, rows: st.rows.filter(x => x.cur).map(x => x.k) }] }) };
+  });
+  return { frames, out: st && { ...st, rows: st.rows.map(r => ({ k: r.k, v: r.v })) } };
+}
+
+// WHERE / HAVING: a check column, then one row (or group) at a time, then the failed ones leave.
+function filterPart(s, d, input, k) {
+  const t = s.tables[0], a = adopt(t.cols, t.rows.map(r => r.v), input);
+  const base = input && a.rows.every(r => input.rows.some(x => x.k === r.k)) ? input : a;
+  const at = base.rows.map(r => a.rows.findIndex(x => x.k === r.k));  // board row → checked row
+  const matchMode = t.rows.some(r => r.m === "match");  // UPDATE/DELETE: rows are picked, not removed
+  const kept = n => at[n] >= 0 && (matchMode ? t.rows[at[n]].m === "match" : t.rows[at[n]].m !== "dropped");
+  const aliases = (MAIN.find(x => x.stmt === s.stmt && x.detail?.type === "group")?.detail.aliases) || {};
+  const unit = d.groups ? "group" : "row", cond = d.checks.map(c => c.sql).join(` ${d.combine || ""} `);
+  const aliased = Object.entries(aliases).filter(([, al]) => new RegExp(`\\b${al}\\b`).test(cond)).map(([e]) => e).join(" ");
+  const used = usedCols({ sql: `${cond} ${aliased}` }, base.cols.map(c => c.label));
+  const chk = { k: `chk${k}`, label: "check" };
+  const miss = matchMode ? "r-skip" : "r-no";  // UPDATE/DELETE leave a failed row alone; WHERE drops it
+  const board = (n, extra) => ({ tables: [T(base, { cols: [chk, ...base.cols], rc: (r, i) => i <= n && !kept(i) ? miss : "",
+    cells: (r, i) => {
+      const seen = i === n ? checkVals(d, d.rows[at[i]] || []) : null;
+      return [i > n ? { h: "·", t: "·", c: "ck" } : kept(i) ? { h: "✓", t: "✓", c: "ck ck-yes" } : { h: "✗", t: "✗", c: "ck ck-no" },
+        ...r.v.map((x, c) => seen && used.includes(c) && seen.has(String(x)) ? hot(x) : withOld(r, x, c))];
+    } })], ...extra });
+  const n = Math.min(base.rows.length, 40), U = unit[0].toUpperCase() + unit.slice(1);
+  const frames = [{ label: `Every ${unit}`, view: board(-1) }];
+  for (let i = 0; i < n; i++)
+    frames.push({ label: `${U} ${i + 1} of ${base.rows.length}`, sub: short(base.rows[i]),
+      card: checkLines(d, d.rows[at[i]] || [], d.groups ? aliases : {}).map(l => l.html).join(""),
+      view: board(i, { rings: [{ k: "ring:row", table: base.id, rows: [base.rows[i].k] }] }) });
+  const out = matchMode ? base : { ...base, rows: base.rows.filter((r, i) => kept(i)) };
+  frames.push({ label: "Result", end: true, view: { tables: [T(out, { rc: (r, i) => matchMode && kept(i) ? "r-match" : "" })] } });
+  return { frames, out };
+}
+
+// JOIN: the other table appears beside this one; its matching values fly into new columns, row by row.
+function joinPart(s, d, left, k, known) {
+  const t = s.tables[0], L = d.left;
+  const lcols = left.cols.map((c, i) => ({ k: c.k, label: t.cols[i] ?? c.label }));
+  const rname = (/JOIN\s+`?([\w$]+)/i.exec(s.title) || [])[1] || "";
+  let right = adopt(t.cols.slice(L), d.right || [], known[rname.toLowerCase()] || null, d.table || rname);
+  const taken = new Set([...left.rows.map(r => r.k), ...left.cols.map(c => c.k)]);
+  if (right.rows.some(r => taken.has(r.k)) || right.cols.some(c => taken.has(c.k)))  // a self-join: the second copy gets its own keys
+    right = { ...right, cols: right.cols.map(c => ({ ...c, k: c.k + "'" })), rows: right.rows.map(r => ({ ...r, k: r.k + "'" })) };
+  right.id = `side${k}`;
+  const cols = [...lcols, ...right.cols];
+  // which combined rows came from which left row, and which right row filled them
+  const used = new Set(), groups = left.rows.map(lr => {
+    const idx = t.rows.map((r, j) => j).filter(j => !used.has(j) && sameRow(t.rows[j].v.slice(0, L), lr.v));
+    idx.forEach(j => used.add(j));
+    return idx;
+  });
+  const cid = `join${k}`, outKey = [], from = [], matchedOf = [];  // the combined table and its rows
+  groups.forEach((idx, i) => {
+    const matched = matchedOf[i] = d.checks.length ? idx.filter(j => d.rows?.[j] && +d.rows[j][0]) : idx;  // no ON: every pair matches
+    const took = new Set();
+    idx.forEach((j, n) => {
+      const q = matched.includes(j) ? right.rows.findIndex((x, p) => !took.has(p) && sameRow(x.v, t.rows[j].v.slice(L))) : -1;
+      if (q >= 0) took.add(q);
+      from[j] = [i, q];
+      outKey[j] = `${left.rows[i].k}>${n}`;
+    });
+  });
+  t.rows.forEach((r, j) => {  // RIGHT JOIN rows with no left row
+    if (outKey[j] !== undefined) return;
+    from[j] = [-1, right.rows.findIndex(x => sameRow(x.v, r.v.slice(L)))];
+    outKey[j] = uid("r");
+  });
+  // the combined table's headers and values are copies that fly down from the two tables above
+  const rel = [...lcols.map(c => [`h:${left.id}:${c.k}`, `h:${cid}:${c.k}`]), ...right.cols.map(c => [`h:${right.id}:${c.k}`, `h:${cid}:${c.k}`])];
+  t.rows.forEach((r, j) => {
+    const [i, q] = from[j], ok = outKey[j];
+    if (i >= 0) lcols.forEach(c => rel.push([`${left.rows[i].k}|${c.k}`, `${ok}|${c.k}`]));
+    if (q >= 0) right.cols.forEach(c => rel.push([`${right.rows[q].k}|${c.k}`, `${ok}|${c.k}`]));
+  });
+  const onTxt = d.checks.map(c => c.sql).join(` ${d.combine || ""} `);
+  const onCols = cs => { const q = cs.flatMap((c, n) => onTxt.includes(c.label) ? [n] : []); return q.length ? q : usedCols({ sql: onTxt }, cs.map(c => c.label)); };
+  const lOn = onCols(lcols), rOn = onCols(right.cols);
+  const title = `${left.title} + ${right.title}`;
+  const combined = n => ({ id: cid, title, cols, newLine: true,  // left rows up to n have been paired
+    rows: left.rows.slice(0, n + 1).flatMap((lr, i) => groups[i].map(j => ({ k: outKey[j], c: "", cells: t.rows[j].v.map(x => cv(x)) }))) });
+  const top = (li = -1, qs = []) => [
+    T(left, { cells: (r, i) => r.v.map((x, c) => i === li && lOn.includes(c) ? hot(x) : cv(x)) }),
+    T(right, { cells: (r, p) => r.v.map((x, c) => qs.includes(p) && rOn.includes(c) ? hot(x) : cv(x)) })];
+  const frames = [{ label: "Both sides", view: { tables: [...top(), combined(-1)] } }];
+  left.rows.slice(0, 40).forEach((lr, i) => {
+    const idx = groups[i], matched = matchedOf[i], qs = idx.map(j => from[j][1]).filter(q => q >= 0);
+    let card = "";
+    if (matched.length) card += d.checks.length ? matched.map(j => checkLines(d, d.rows[j]).map(l => l.html).join("")).join("") : "";
+    else {
+      const c0 = d.checks[0], raw0 = idx.length ? d.rows[idx[0]] || [] : [];
+      if (c0 && "left" in c0 && raw0[1] === null)
+        card += `<div class="chk"><span class="expr">${esc(c0.left)}</span> ${v(null)}<span class="arrow-r">→</span><span class="t-null">NULL never matches</span></div>`;
+      card += d.side === "LEFT" ? `<div class="verdict yes">No match → kept with NULLs</div>` : `<div class="verdict no">No match → dropped</div>`;
+    }
+    frames.push({ label: `Left row ${i + 1} of ${left.rows.length}`, sub: short(lr), card,
+      view: { tables: [...top(i, qs), combined(i)], rings: [
+        { k: "ring:l", table: left.id, rows: [lr.k] },
+        ...qs.map((q, n) => ({ k: `ring:r${n}`, table: right.id, rows: [right.rows[q].k] })),
+        { k: "ring:row", table: cid, rows: idx.map(j => outKey[j]) }] } });
+  });
+  // once every row is combined, the two tables above leave and the combined one takes their place
+  const out = { id: cid, title, cols, rows: t.rows.map((r, j) => ({ k: outKey[j], v: r.v })) };
+  frames.push({ label: "Result", end: true, view: one(out) });
+  return { frames, out, rel };
+}
+
+// GROUP BY: colors, then sorted into groups, then each group folds into one row.
+function groupPart(s, d, input) {
+  const t = s.tables[0], sum = d.summary, nk = d.keys.length, G = sum.rows.length;
+  const a = adopt(t.cols, t.rows.map(r => r.v), input);
+  a.rows.forEach((r, i) => { r.g = t.rows[i].g; });
+  const gOf = new Map(a.rows.map(r => [r.k, r.g]));
+  const start = input && a.rows.every(r => input.rows.some(x => x.k === r.k)) ? input : a;
+  const colored = { ...start, rows: start.rows.map(r => ({ ...r, g: gOf.get(r.k) })) };
+  const scols = adopt(sum.cols, [], a).cols;  // grouped and picked columns keep their keys; aggregates are new
+  const idx = scols.map(c => a.cols.findIndex(x => x.k === c.k));
+  const members = g => a.rows.filter(r => r.g === g);
+  const rel = [];
+  for (let g = 1; g <= G; g++) {
+    const m = members(g);
+    m.slice(1).forEach(r => ["#", ...scols.map(c => c.k)].forEach(c => rel.push([`${m[0].k}|${c}`, `${r.k}|${c}`])));
+  }
+  const folded = upto => ({ ...a, cols: scols, rows: sum.rows.flatMap((sr, n) => {
+    const g = n + 1, m = members(g);
+    if (!m.length) return [];
+    if (g <= upto) return [{ k: m[0].k, g, v: sr.v }];
+    return m.map(r => ({ k: r.k, g, v: idx.map((i, j) => i >= 0 ? r.v[i] : j < nk ? sr.v[j] : undefined) }));
+  }) });
+  const na = nk + (d.picked || 0);  // aggregates come after the keys and the picked columns
+  const frames = [
+    { label: "Groups", view: one(colored) },
+    { label: "Sorted into groups", view: { tables: [T(a, { gaps: true })] } }];
+  for (let g = 1; g <= Math.min(G, 40); g++) {
+    const key = sum.rows[g - 1].v.slice(0, nk), st = folded(g);
+    frames.push({ label: `Group ${g} of ${G}`, sub: d.keys.map((kk, j) => `${kk} = ${key[j] ?? "NULL"}`).join(", "),
+      card: sum.cols.slice(na).map((c, j) => `<div class="chk"><span class="expr">${esc(c)}</span><span class="arrow-r">→</span>${v(sum.rows[g - 1].v[na + j])}</div>`).join(""),
+      view: { tables: [T(st, { gaps: true })], rings: [{ k: "ring:row", table: a.id, rows: [members(g)[0]?.k] }] } });
+  }
+  const out = folded(G);
+  frames.push({ label: "Result", end: true, view: one(out) });
+  return { frames, out, rel };
+}
+
+// SELECT: each output column is built next to the input, then the input columns leave.
+function selectPart(s, d, input, k) {
+  const t = s.tables[0], text = SC.statements[s.stmt].text, place = sql => locate(text, sql, !!s.scope);
+  const labels = input.cols.map(c => c.label);
+  const oc = d.cols.map((c, ci) => ({ k: `o${k}.${ci}`, label: t.cols[ci] }));
+  const title = nameOf(t, "Result");
+  if (input.rows.length !== t.rows.length) {  // rows were combined (COUNT(*) without GROUP BY ...): no row-by-row view
+    const rings = [...new Set(d.cols.flatMap(c => usedCols(c, labels)))].map(u => ({ k: `ring:col:${input.cols[u].k}`, table: input.id, col: input.cols[u].k }));
+    const out = { id: input.id, title, cols: oc, rows: t.rows.map(r => ({ k: uid("r"), v: r.v })) };
+    return { frames: [{ label: "Columns it reads", view: one(input, { rings }) }, { label: "Result", end: true, view: one(out) }], out };
+  }
+  // columns copied straight from an input column (a name, or an aggregate GROUP BY already worked out)
+  const norm = x => x.replace(/`/g, "").toLowerCase();
+  const copy = d.cols.map(c => {
+    if (c.star) return -1;
+    const exact = labels.findIndex(l => norm(l) === norm(c.sql));
+    if (exact >= 0) return exact;
+    const u = /^[\w`.$]+$/.test(c.sql) ? usedCols(c, labels) : [];
+    return u.length === 1 ? u[0] : -1;
+  });
+  // MySQL can hand the rows back in another order: pair each output row with its input row through the copies
+  const inOf = [], free = new Set(input.rows.map((r, n) => n));
+  t.rows.forEach((r, i) => {
+    let n = [...free].find(n => copy.every((u, ci) => u < 0 || same(input.rows[n].v[u], r.v[ci])));
+    if (n === undefined) n = free.has(i) ? i : [...free][0];
+    free.delete(n); inOf[i] = n;
+  });
+  const outOf = []; inOf.forEach((n, i) => { outOf[n] = i; });
+  const nOf = new Map(input.rows.map((r, n) => [r.k, n]));
+  // a plain copy is the input column itself: it gets picked in place (only a second copy of it needs a new column)
+  const reuse = copy.map((u, ci) => u >= 0 && copy.indexOf(u) === ci);
+  reuse.forEach((y, ci) => { if (y) Object.assign(oc[ci], { k: input.cols[copy[ci]].k }, d.cols[ci].alias ? {} : { label: input.cols[copy[ci]].label }); });
+  const rel = [];  // a second copy's values fly over from its input column
+  copy.forEach((u, ci) => { if (u >= 0 && !reuse[ci]) input.rows.forEach(r => rel.push([`${r.k}|${input.cols[u].k}`, `${r.k}|${oc[ci].k}`])); });
+  const X = d.extra_rows || [], raw = i => X[i] || [];  // per output row: the values of each piece (see select_detail)
+  const rowKey = i => input.rows[inOf[i]].k, rowRing = i => ({ k: "ring:row", table: input.id, rows: [rowKey(i)] });
+  const colRings = us => us.map(u => ({ k: `ring:col:${input.cols[u].k}`, table: input.id, col: input.cols[u].k }));
+  // The input with the output columns built so far. done(i): output row i already shows column ci.
+  // o.rows: the input rows in another order (a window's sort); o.hot(i): output row i lights up its o.used values.
+  const board = (ci, done, extra = [], o = {}) => {
+    const added = oc.map((x, j) => j).filter(j => j <= ci && !reuse[j]), used = o.used || usedCols(d.cols[ci], labels);
+    return { tables: [T(o.rows ? { ...input, rows: o.rows } : input, { gaps: o.gaps, cols: [...input.cols, ...added.map(j => oc[j])],
+      cells: r => { const i = outOf[nOf.get(r.k)];
+        return [...r.v.map((x, c) => o.hot?.(i) && used.includes(c) ? hot(x) : cv(x)),
+          ...added.map(j => j < ci || done(i) ? cv(t.rows[i].v[j]) : EMPTY)]; } })],
+      rings: [...(reuse[ci] ? [] : colRings(o.rings || used)),
+        ...oc.slice(0, ci).map(x => ({ k: `ring:pick:${x.k}`, table: input.id, col: x.k, c: "pick" })),  // already picked
+        { k: "ring:out", table: input.id, col: oc[ci].k, c: "out" }, ...extra] };
+  };
+  const frames = [], R = Math.min(t.rows.length, 40);  // ponytail: 40 rows replayed per column
+  // CASE and calculations go down the table as shown (MySQL may hand the output rows back in another order)
+  const down = input.rows.slice(0, R).map((r, n) => outOf[n]);
+  const eachRow = f => down.forEach((i, k) => { const upto = new Set(down.slice(0, k + 1));
+    f(i, { label: `Row ${k + 1} of ${t.rows.length}`, done: j => upto.has(j), hot: j => j === i }); });
+  const chk = (...h) => `<div class="chk">${h.join(" ")}</div>`, to = x => `<span class="arrow-r">→</span>${v(x)}`;
+  const vals = xs => xs.slice(0, 12).map(v).join(" ") + (xs.length > 12 ? ` <span class="expr">+${xs.length - 12} more</span>` : "");
+
+  // CASE / IF: which WHEN each row hits
+  const caseFrames = (c, ci) => eachRow((ri, o) => {
+    const x = raw(ri), tv = c.case.branches.map(b => x[b.offset]), win = tv.findIndex(y => +y === 1);
+    const got_ = e => `→ ${/^('[^']*'|-?[\d.]+|NULL)$/i.test(e) ? "" : `<span class="mono">${esc(e)}</span> = `}${v(t.rows[ri].v[ci])}`;  // a formula names itself
+    const lines = c.case.branches.map((b, bi) => {
+      const skipped = win >= 0 && bi > win;
+      const got = skipped ? "" : checkLines(b, x.slice(b.offset + 1));
+      const vs = skipped ? `<span class="expr">skipped</span>` : got.map(y => y.vals).join(` <b>${b.combine || ""}</b> `);
+      return `<div class="when ${skipped ? "skip" : bi === win ? "win" : ""}"><span class="wm">${skipped ? "·" : +tv[bi] ? "✓" : "✗"}</span><span class="mono">${c.case.if ? "IF" : "WHEN"} ${esc(c.case.operand ? `${c.case.operand} = ${b.when}` : b.when)}</span><span class="wv">${vs}</span><span class="wt">${bi === win ? got_(b.then) : ""}</span></div>`;
+    }).join("") + (c.case.else !== undefined && c.case.else !== null ? `<div class="when ${win < 0 ? "win" : "skip"}"><span class="wm">${win < 0 ? "✓" : "·"}</span><span class="mono">${c.case.if ? "OTHERWISE" : "ELSE"}</span><span class="wv"><span class="expr">${win < 0 ? "nothing matched" : "skipped"}</span></span><span class="wt">${win < 0 ? got_(c.case.else) : ""}</span></div>` : "");
+    const b = win >= 0 ? c.case.branches[win] : null;
+    frames.push({ label: o.label, sub: oc[ci].label,
+      under: b ? place(`WHEN ${b.when} THEN ${b.then}`) || place(b.when) : place(`ELSE ${c.case.else}`) || place(c.case.else),
+      card: `<div class="whens">${lines}</div>`, view: board(ci, o.done, [rowRing(ri)], { hot: o.hot }) });
+  });
+
+  // Any other calculation: each step worked out with this row's values, innermost first
+  const calcFrames = (c, ci) => eachRow((ri, o) => {
+    frames.push({ label: o.label, sub: oc[ci].label, under: place(c.sql), card: `<div class="calc">${calcHtml(c.calc, raw(ri))}</div>`, view: board(ci, o.done, [rowRing(ri)], { hot: o.hot }) });
+  });
+
+  // Window function: split into partitions, sort, then each row reads the rows its function looks at
+  const windowFrames = (c, ci, w, fills) => {
+    const all = t.rows.map((r, i) => i), pid = i => w.pid !== undefined ? raw(i)[w.pid] : 1;
+    const S = all.sort((a, b) => pid(a) - pid(b) || raw(a)[w.pos] - raw(b)[w.pos]);
+    const partOf = i => S.filter(j => pid(j) === pid(i)), okey = i => JSON.stringify(w.ovals.map(q => raw(i)[q]));
+    const cols = sqls => [...new Set(sqls.flatMap(q => usedCols({ sql: q }, labels)))];
+    const pUsed = cols(w.part), oUsed = cols(w.order.map(o => o.sql)), aUsed = w.argsql ? cols([w.argsql]) : [];
+    const paint = rows => w.part.length ? rows.map(r => ({ ...r, g: pid(outOf[nOf.get(r.k)]) })) : rows;
+    const sorted = paint(S.map(i => input.rows[inOf[i]])), gaps = w.part.length > 0;
+    const under = place(w.sql) || place(c.sql), oname = w.order.map(o => o.sql).join(", ");
+    if (w.part.length) {
+      const P = [...new Set(S.map(pid))];
+      frames.push({ label: "Split into partitions", sub: `PARTITION BY ${w.part.join(", ")}`, under,
+        card: `<div class="gkey">${P.slice(0, 16).map(p => { const j = S.find(q => pid(q) === p);
+          return `<span><i style="background:${GC[(p - 1) % GC.length]}"></i>Partition ${p}<em>${esc(w.pvals.map(q => raw(j)[q] ?? "NULL").join(", "))}</em></span>`; }).join("")}</div>`,
+        view: board(ci, () => false, [], { rows: paint(input.rows), used: pUsed }) });
+    }
+    if (w.part.length || w.order.length)
+      frames.push({ label: w.order.length ? "Sorted" : "Partitions together", under,
+        sub: w.order.length ? `ORDER BY ${w.order.map(o => o.sql + (o.desc ? " DESC" : "")).join(", ")}` : "",
+        view: board(ci, () => false, [], { rows: sorted, gaps, used: oUsed }) });
+    const fn = w.fn, back = fn === "LAG";
+    S.slice(0, R).forEach((i, k) => {
+      const L = partOf(i), p = L.indexOf(i) + 1, N = L.length, x = raw(i), res = x[w.res];
+      const peers = L.map((j, q) => okey(j) === okey(i) ? q + 1 : 0).filter(Boolean), first = peers[0], last = peers.at(-1);
+      const upto = n => L.slice(0, n).map((j, q) => q + 1), arg = q => raw(L[q - 1])[w.arg];
+      let lit = [], used = oUsed, card;
+      if (fn === "ROW_NUMBER") {
+        lit = upto(p); card = chk(`<span class="expr">rows counted from the top</span>`, `<b>${p}</b>`, to(res));
+      } else if (fn === "RANK" || fn === "PERCENT_RANK") {
+        lit = upto(first - 1);
+        card = chk(`<span class="expr">rows ahead of this ${esc(oname)}</span>`, `<b>${first - 1}</b>`) +
+          (fn === "RANK" ? chk(`<span class="mono">${first - 1} + 1</span>`, to(res))
+            : chk(`<span class="mono">(rank − 1) / (rows − 1) = ${first - 1} / ${N - 1}</span>`, to(res))) +
+          (peers.length > 1 ? chk(`<span class="expr">tied with ${plural(peers.length - 1, "other row")}, so they share it</span>`) : "");
+      } else if (fn === "DENSE_RANK") {
+        lit = upto(last);
+        const seen = [...new Map(L.slice(0, last).map(j => [okey(j), w.ovals.map(q => raw(j)[q]).join(", ")])).values()];
+        card = chk(`<span class="expr">different ${esc(oname)} values so far</span>`, vals(seen)) + chk(`<span class="expr">count</span>`, to(res));
+      } else if (fn === "CUME_DIST") {
+        lit = upto(last);
+        card = chk(`<span class="expr">rows up to this one (ties included) / rows</span>`, `<span class="mono">${last} / ${N}</span>`, to(res));
+      } else if (fn === "NTILE") {
+        lit = L.map((j, q) => same(raw(j)[w.res], res) ? q + 1 : 0).filter(Boolean);
+        card = chk(`<span class="expr">${plural(N, "row")} dealt into ${esc(w.n)} buckets, top to bottom</span>`, to(res));
+      } else if (fn === "LAG" || fn === "LEAD") {
+        const off = parseInt(w.offset ?? "1", 10) || 0, tp = back ? p - off : p + off, dir = back ? "back" : "ahead";
+        used = aUsed;
+        if (tp >= 1 && tp <= N) {
+          lit = [tp];
+          card = chk(`<span class="expr">go ${plural(off, "row")} ${dir}: row ${tp}</span>`, `<span class="mono">${esc(w.argsql)}</span>`, v(arg(tp)), to(res));
+        } else card = chk(`<span class="expr">no row ${off} ${dir} in this ${w.part.length ? "partition" : "table"}, so the default</span>`, `<span class="mono">${esc(w.default ?? "NULL")}</span>`, to(res));
+      } else {  // reads a frame: aggregates, FIRST_VALUE, LAST_VALUE, NTH_VALUE
+        const hi = +x[w.hi], lo = hi - +x[w.size] + 1;
+        lit = hi >= lo ? L.slice(lo - 1, hi).map((j, q) => lo + q) : [];
+        used = aUsed.length ? aUsed : oUsed;
+        const why = w.spec || (w.order.length ? "default: from the top down to this row, ties included" : "default: the whole " + (w.part.length ? "partition" : "table"));
+        card = chk(`<span class="expr">frame</span>`, lit.length ? `<b>rows ${lo}–${hi}</b>` : "<b>no rows</b>", `<span class="expr">(${esc(why)})</span>`);
+        const nth = fn === "FIRST_VALUE" ? lo : fn === "LAST_VALUE" ? hi : fn === "NTH_VALUE" ? lo + (parseInt(w.offset, 10) || 1) - 1 : 0;
+        if (nth) {
+          card += nth >= lo && nth <= hi ? chk(`<span class="expr">row ${nth}:</span>`, `<span class="mono">${esc(w.argsql)}</span>`, v(arg(nth)), to(res))
+            : chk(`<span class="expr">the frame has no row ${nth - lo + 1}</span>`, to(res));
+          if (lit.length) lit = [nth];
+        } else card += w.arg !== undefined ? chk(`<span class="mono">${esc(fn)}(</span>${vals(lit.map(arg))}<span class="mono">)</span>`, to(res))
+          : chk(`<span class="mono">${esc(fn)}(*)</span> <span class="expr">counts the rows</span>`, to(res));
+      }
+      const litSet = new Set(lit.map(q => L[q - 1])), doneSet = new Set(S.slice(0, k + 1));
+      frames.push({ label: `Row ${k + 1} of ${S.length}`, sub: w.part.length ? `row ${p} of ${N} in its partition` : "", under, card,
+        view: board(ci, j => fills && doneSet.has(j), [
+          ...(lit.length ? [{ k: "ring:frame", table: input.id, rows: [...litSet].map(rowKey), c: "frame" }] : []), rowRing(i)],
+          { rows: sorted, gaps, used, rings: [...new Set([...oUsed, ...aUsed])], hot: j => j === i || litSet.has(j) }) });
+    });
+  };
+
+  d.cols.forEach((c, ci) => {
+    const replay = X.length > 0 && !!(c.case || c.calc || c.windows);
+    frames.push({ label: `Column ${ci + 1} of ${d.cols.length}`, sub: oc[ci].label, under: place(c.sql),
+      card: c.name !== c.sql && !c.star && !(reuse[ci] && !c.alias) ? `<div class="chk"><span class="expr">${esc(c.name)}</span><b>=</b><span class="mono">${esc(c.sql.length > 90 ? c.sql.slice(0, 90) + "…" : c.sql)}</span></div>` : "",
+      view: board(ci, () => !replay) });
+    if (!replay) return;
+    if (c.case) return caseFrames(c, ci);
+    (c.windows || []).forEach(w => windowFrames(c, ci, w, !c.calc && c.windows.length === 1));
+    if (c.calc) calcFrames(c, ci);
+  });
+  const out = { id: input.id, title, cols: oc, rows: t.rows.map((r, i) => ({ k: input.rows[inOf[i]].k, v: r.v })) };
+  frames.push({ label: "Result", end: true, view: one(out) });
+  return { frames, out, rel };
+}
+
+// ORDER BY: the rows glide into their new order.
+function orderPart(s, input) {
+  const t = s.tables[0], a = adopt(t.cols, t.rows.map(r => r.v), input, nameOf(t, input.title));
+  const by = usedCols({ sql: s.title.replace(/^ORDER BY\s*/i, "").replace(/\b(ASC|DESC)\b/gi, "") }, input.cols.map(c => c.label));
+  const rings = by.map(u => ({ k: `ring:col:${input.cols[u].k}`, table: input.id, col: input.cols[u].k }));
+  return { frames: [{ label: "Before sorting", view: one(input, { rings }) }, { label: "Sorted", end: true, view: one(a, { rings }) }], out: a };
+}
+
+// DISTINCT / LIMIT: the rows that go are crossed out, then leave.
+function cutPart(s, input) {
+  const t = s.tables[0], a = adopt(t.cols, t.rows.map(r => r.v), input, nameOf(t, input.title)), keep = new Set(a.rows.map(r => r.k));
+  return { frames: [
+    { label: "Before", view: { tables: [T(input, { rc: r => keep.has(r.k) ? "" : "r-no" })] } },
+    { label: "After", end: true, view: one(a) }], out: a };
+}
+
+// ---------- board layout: every box, header, cell and outline gets a spot ----------
+const TH = 38, HH = 34, RH = 34, RN = 40, MAXV = 120;
+function layout(view, W) {
+  const items = [], at = {};
+  let x = 0, y = 0, lineH = 0;
+  for (const tb of view.tables) {
+    const shown = tb.rows.slice(0, MAXV);
+    // ponytail: widths from JetBrains Mono metrics (13px cells ≈ 7.9px a character); a fallback font runs slightly off
+    const ws = tb.cols.map((c, i) => Math.round(Math.min(300, Math.max(44, 28 + Math.max(c.label.length * 7.4, ...shown.map(r => (r.cells[i]?.t.length || 1) * 7.9))))));
+    const right = tb.right ?? plural(tb.rows.length, "row");
+    const need = Math.round(48 + tb.title.length * 7.9 + right.length * 6.8) - (RN + ws.reduce((p, q) => p + q, 0) + 2);
+    if (need > 0 && ws.length) ws[ws.length - 1] += need;  // room for the title: the last column takes the slack
+    const w = RN + ws.reduce((p, q) => p + q, 0) + 2;
+    if (x && (x + w > W || tb.newLine)) { x = 0; y += lineH + 24; lineH = 0; }
+    const xs = []; let cx = x + 1 + RN;
+    ws.forEach(cw => { xs.push(cx); cx += cw; });
+    let ry = y + TH + HH;
+    const ys = shown.map(r => { if (r.gap) ry += 8; ry += RH; return ry - RH; });
+    const extra = tb.rows.length > MAXV ? 30 : 0, h = ry - y + extra + 1;
+    items.push({ k: `box:${tb.id}`, cls: "box", x, y, w, h, html: `<div class="bt"><b>${esc(tb.title)}</b><span>${right}</span></div>${extra ? `<div class="more">+${tb.rows.length - MAXV} more rows</div>` : ""}` });
+    items.push({ k: `h:${tb.id}:#`, cls: "th rn", x: x + 1, y: y + TH, w: RN, h: HH, html: "#" });
+    tb.cols.forEach((c, i) => items.push({ k: `h:${tb.id}:${c.k}`, cls: "th", x: xs[i], y: y + TH, w: ws[i], h: HH, html: esc(c.label), t: c.label }));
+    shown.forEach((r, n) => {
+      const rc = (r.c ? " " + r.c : "") + (n === shown.length - 1 ? " last" : "");
+      items.push({ k: `${r.k}|#`, cls: "td rn" + rc, x: x + 1, y: ys[n], w: RN, h: RH, html: String(n + 1), gc: r.gc });
+      tb.cols.forEach((c, i) => { const cell = r.cells[i] || EMPTY;
+        items.push({ k: `${r.k}|${c.k}`, cls: `td${rc}${cell.c ? " " + cell.c : ""}`, x: xs[i], y: ys[n], w: ws[i], h: RH, html: cell.h, t: cell.t, gc: r.gc }); });
+    });
+    at[tb.id] = { x, y, w, xs, ws, ys, rows: shown.map(r => r.k), cols: tb.cols.map(c => c.k) };
+    x += w + 40; lineH = Math.max(lineH, h);
+  }
+  for (const R of view.rings || []) {
+    const p = at[R.table]; if (!p) continue;
+    if (R.rows) {
+      const ns = R.rows.map(k => p.rows.indexOf(k)).filter(n => n >= 0); if (!ns.length) continue;
+      const a = Math.min(...ns), b = Math.max(...ns);
+      const o = R.c === "frame" ? 4 : 0;  // a window's frame sits just outside the current row's outline
+      items.push({ k: R.k, cls: "ring " + (R.c || ""), x: p.x - 3 - o, y: p.ys[a] - 2 - o, w: p.w + 6 + 2 * o, h: p.ys[b] + RH - p.ys[a] + 4 + 2 * o, html: "" });
+    } else {
+      const i = p.cols.indexOf(R.col); if (i < 0) continue;
+      const bottom = p.ys.length ? p.ys.at(-1) + RH : p.y + TH + HH;
+      items.push({ k: R.k, cls: "ring col " + (R.c || ""), x: p.xs[i] + 2, y: p.y + TH + 2, w: p.ws[i] - 4, h: bottom - p.y - TH - 4, html: "" });
+    }
+  }
+  return items;
+}
+
+// ---------- drawing: pieces with the same key glide; new ones grow in, gone ones fade (or merge into a partner) ----------
+let live = new Map(), endAt = 0;
+const EASE = "cubic-bezier(.45, 0, .25, 1)";
+function put(el, it, o) {
+  el.style.transform = `translate(${it.x}px, ${it.y}px)`;
+  el.style.width = it.w + "px"; el.style.height = it.h + "px"; el.style.opacity = o;
+}
+function timing(el, move, md, fade, fd) {
+  el.style.transition = `transform ${move}ms ${EASE} ${md}ms, width ${move}ms ${EASE} ${md}ms, height ${move}ms ${EASE} ${md}ms, opacity ${fade}ms ease ${fd}ms, background-color .3s, color .3s, box-shadow .3s`;
+}
+function draw(items, rel = [], o = {}) {
+  const B = $("#board"), now = performance.now();
+  const instant = o.instant || matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const fast = !instant && now < endAt;  // the last step is still moving: catch up quickly instead of queueing
+  const next = new Map();
+  for (const it of items) { let k = it.k, n = 1; while (next.has(k)) k = `${it.k}~${++n}`; it.k = k; next.set(k, it); }
+  // rel pairs are [origin, copy]: a copy grows out of its origin and, going back, shrinks into it; an origin never moves onto its copy
+  const origin = new Map();
+  for (const [a, b] of rel) { if (!origin.has(b)) origin.set(b, []); origin.get(b).push(a); }
+  const pal = (k, pool) => (origin.get(k) || []).find(p => pool.has(p));
+  const old = new Map([...live].map(([k, r]) => [k, r.it]));
+  const gone = [...live.keys()].filter(k => !next.has(k));
+  const moves = items.some(it => { const p = old.get(it.k); return p && (p.x !== it.x || p.y !== it.y || p.w !== it.w || p.h !== it.h); })
+    || gone.some(k => pal(k, next)) || items.some(it => !old.has(it.k) && pal(it.k, old));
+  const M = instant ? 0 : fast ? 220 : 650, F = instant ? 0 : fast ? 150 : 300;
+  const leave = !instant && !fast && !o.exitLast && gone.some(k => !pal(k, next)) ? 300 : 0;
+  const mAt = leave, inAt = mAt + (moves && !fast ? M : 0), outAt = o.exitLast && !fast ? mAt + M * .5 : 0;
+  // 1. what leaves: fades where it is (first), or glides into the piece it merges with
+  for (const k of gone) {
+    const { el, it } = live.get(k), to = pal(k, next);
+    live.delete(k);
+    if (to) { el.style.zIndex = 4; timing(el, M, mAt, M, mAt); put(el, next.get(to), 0); }  // fades as it glides in
+    else { timing(el, 0, 0, F, outAt); el.style.opacity = 0; }
+    setTimeout(() => el.remove(), (to ? mAt + M : outAt + F) + 80);
+  }
+  // 2. what's new starts at its partner's old spot (a copy flying out) or right where it will be
+  const born = new Map();  // element -> did it fly out of a partner?
+  for (const it of items) {
+    if (live.has(it.k)) continue;
+    const el = document.createElement("div"), src = pal(it.k, old);
+    el.className = "it " + it.cls; el.innerHTML = it.html;
+    el.style.transition = "none";
+    put(el, src ? old.get(src) : it, src ? 1 : 0);
+    if (src) el.style.zIndex = 4;
+    B.append(el);
+    live.set(it.k, { el, it: null });
+    born.set(el, !!src);
+  }
+  if (born.size) B.offsetWidth;  // one layout pass, so the starting spots take effect
+  // 3. everything goes to its new spot; a value that arrives or changes glows briefly
+  const glows = it => !instant && o.flash !== false && /^td/.test(it.cls) && !/\brn\b/.test(it.cls) && it.t !== "…";
+  for (const it of items) {
+    const r = live.get(it.k), el = r.el, prev = r.it;
+    if (born.has(el)) {
+      const flew = born.get(el);
+      if (flew) timing(el, M, mAt, 0, 0); else timing(el, 0, 0, F, inAt);
+      el.style.setProperty("--fd", (flew ? mAt + M : inAt) + "ms");
+      el.className = "it " + it.cls + (glows(it) && !flew ? " flash" : "");
+    } else {
+      timing(el, M, mAt, F, mAt);
+      if (prev.html !== it.html) el.innerHTML = it.html;
+      const had = el.classList.contains("flash");
+      el.className = "it " + it.cls + (had ? " flash" : "");
+      if (glows(it) && prev.t !== it.t) {  // replay the glow
+        el.classList.remove("flash"); el.style.setProperty("--fd", mAt + "ms"); el.offsetWidth; el.classList.add("flash");
+      }
+    }
+    el.style.setProperty("--gc", it.gc || "transparent");
+    put(el, it, 1);
+    if (el.style.zIndex) setTimeout(() => { el.style.zIndex = ""; }, mAt + M + 20);
+    r.it = it;
+  }
+  const H = Math.max(0, ...items.filter(i => i.cls === "box").map(i => i.y + i.h));
+  B.style.transitionDelay = mAt + "ms";
+  B.style.height = H + "px";
+  endAt = now + inAt + (born.size ? F : 0) + 60;
+}
+function clearBoard() { live.forEach(r => r.el.remove()); live = new Map(); endAt = 0; }
+const boardWidth = () => Math.max(320, ($(".board-wrap")?.clientWidth || 800) - 36);
 
 // ---------- where each part lives in the code ----------
 function range(s) {
@@ -738,7 +1033,7 @@ function range(s) {
 }
 
 // ---------- rendering ----------
-let cur = 0, sub = 0, enter = true, timer = null, F = [];
+let cur = 0, sub = 0, timer = null, F = [];
 const badge = i => `<button class="badge ${i === cur ? "on" : i < cur ? "done" : ""}" data-i="${i}" data-kind="${MAIN[i].kind}" title="${esc(MAIN[i].title)}">${i + 1}</button>`;
 
 function flow(k) {
@@ -750,28 +1045,12 @@ function flow(k) {
   return inN === null ? `out <b>${outN}</b> ${unit}` : `in <b>${inN}</b> ${unit} → out <b>${outN}</b>`;
 }
 
-function panel() {
-  const s = MAIN[cur], f = F[sub];
-  const dots = F.length > 1 ? F.map((x, i) => `<button class="${i === sub ? "on" : i < sub ? "done" : ""} ${x.end ? "end" : ""}" data-sub="${i}" title="${esc(x.label)}"></button>`).join("") : "";
-  return `<div class="panel ${enter ? "fade" : ""}" data-kind="${s.kind}">
-    <div class="p-head"><span class="p-title">${esc(s.title)}</span>${s.scope ? `<span class="p-scope">${esc(s.scope)}</span>` : ""}<span class="p-flow">${flow(cur)}</span></div>
-    <div class="p-explain">${brief(s)}</div>
-    ${F.length > 1 ? `<div class="sub">
-      <button class="btn" data-go="-1" aria-label="Previous inner step" ${sub ? "" : "disabled"}>↑</button>
-      <button class="btn" data-go="1" aria-label="Next inner step" ${sub < F.length - 1 ? "" : "disabled"}>↓</button>
-      <button class="btn" data-play>${timer ? "❚❚ Pause" : "▶ Play"}</button>
-      <span class="label">${esc(f.label)}${f.sub ? `<small>${esc(f.sub)}</small>` : ""}</span>
-      <div class="dots">${dots}</div></div>` : ""}
-    ${f.card ? `<div class="focus-card">${f.card}</div>` : ""}
-    <div class="tables">${f.body}</div>
-  </div>`;
-}
-
-function render(scroll = true) {
-  const s = MAIN[cur], f = F[sub];
+// ---------- rendering: the code on top, then the stage (what this step does) and its board ----------
+function renderCode() {
+  const f = F[sub];
   let html = "";
   const starts = MAIN.map((x, i) => i).filter(i => MAIN[i].stmt === null);
-  if (starts.length) html += `<div class="card start-card"><div class="card-head">${starts.map(badge).join("")} Starting tables</div>${starts.includes(cur) ? panel() : ""}</div>`;
+  if (starts.length) html += `<div class="cb-start">${starts.map(badge).join("")}<span>Starting tables</span></div>`;
   SC.statements.forEach((st, k) => {
     if (st.phase !== "code") return;
     const mine = MAIN.map((x, i) => i).filter(i => MAIN[i].stmt === k);
@@ -782,8 +1061,7 @@ function render(scroll = true) {
       return { i, r, whole, from: whole ? last : lineOf(text, r[0]), to: whole ? last : lineOf(text, r[1]) };
     });
     const active = at.find(a => a.i === cur), under = active && f && f.under;
-    const n = SC.statements.slice(0, k + 1).filter(x => x.phase === "code").length;
-    html += `<div class="card"><div class="card-head">Statement ${n}</div><div class="lines">`;
+    html += `<div class="stmt">`;
     let offset = 0;
     lines.forEach((ln, li) => {
       const a0 = offset, a1 = offset + ln.length;
@@ -800,336 +1078,107 @@ function render(scroll = true) {
         if (active && x0 >= active.r[0] && x1 <= active.r[1]) seg = `<mark class="hl">${seg}</mark>`;
         src += seg;
       }
-      const dim = active && !active.whole && (li < lineOf(text, active.r[0]) || li > active.to);
-      html += `<div class="line ${dim ? "dim" : ""}"><div class="gut">${at.filter(a => a.from === li).map(a => badge(a.i)).join("")}</div><div class="src">${src || " "}</div></div>`;
-      if (active && li === active.to) html += panel();
+      const dim = !active || (!active.whole && (li < lineOf(text, active.r[0]) || li > active.to));
+      html += `<div class="line ${dim ? "dim" : "on"}"><div class="gut">${at.filter(a => a.from === li).map(a => badge(a.i)).join("")}</div><div class="src">${src || " "}</div></div>`;
       offset = a1 + 1;
     });
-    html += `</div></div>`;
+    html += `</div>`;
   });
-  $("#doc").innerHTML = html;
-  $("#label").innerHTML = `<span style="color:var(--muted)">Part ${cur + 1} of ${MAIN.length}</span> &nbsp; <b>${esc(s.title)}</b>`;
+  const box = $("#codebox");
+  box.innerHTML = html;
+  // keep the highlighted code in view inside the box
+  const on = box.querySelector(".badge.on") || box.querySelector(".line.on");
+  if (on) {
+    const r = on.getBoundingClientRect(), b = box.getBoundingClientRect();
+    if (r.top < b.top + 8 || r.bottom > b.bottom - 8) box.scrollTop += r.top - b.top - 24;
+  }
+}
+
+function renderHead() {
+  const s = MAIN[cur], f = F[sub], head = $("#shead");
+  const dots = F.length > 1 ? F.map((x, i) => `<button class="${i === sub ? "on" : i < sub ? "done" : ""} ${x.end ? "end" : ""}" data-sub="${i}" title="${esc(x.label || "")}"></button>`).join("") : "";
+  const first = cur === 0 && sub === 0, lastStep = cur === MAIN.length - 1 && sub === F.length - 1;
+  const h0 = head.offsetHeight;
+  $(".stage").dataset.kind = s.kind;
+  head.innerHTML = `<div class="p-head"><span class="p-title">${esc(s.title)}</span>${s.scope ? `<span class="p-scope">${esc(s.scope)}</span>` : ""}<span class="p-flow">${flow(cur)}</span></div>
+    <div class="p-explain">${brief(s)}</div>
+    <div class="sub">
+      <button class="btn" data-go="-1" aria-label="Previous step" ${first ? "disabled" : ""}>↑</button>
+      <button class="btn" data-go="1" aria-label="Next step" ${lastStep ? "disabled" : ""}>↓</button>
+      <button class="btn" data-play>${timer ? "❚❚ Pause" : "▶ Play"}</button>
+      ${f.label ? `<span class="label">${esc(f.label)}${f.sub ? `<small>${esc(f.sub)}</small>` : ""}</span>` : ""}
+      <div class="dots">${dots}</div></div>
+    ${f.card ? `<div class="focus-card">${f.card}</div>` : ""}`;
+  // the head grows or shrinks smoothly, so the board under it slides instead of jumping
+  const h1 = head.offsetHeight;
+  if (h0 && h0 !== h1 && !matchMedia("(prefers-reduced-motion: reduce)").matches)
+    head.animate({ height: [h0 + "px", h1 + "px"] }, { duration: 300, easing: EASE });
+}
+
+let was = -1;  // the part shown before, so a move between two parts can use both parts' splits and merges
+function show(o = {}) {
+  const f = F[sub];
+  renderCode(); renderHead();
+  $("#label").innerHTML = `<span style="color:var(--muted)">Part ${cur + 1} of ${MAIN.length}</span> &nbsp; <b>${esc(MAIN[cur].title)}</b>`;
   $("#prev").disabled = cur === 0;
   $("#next").disabled = cur === MAIN.length - 1;
-  if (scroll) document.querySelector(".panel")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  const items = layout(f.view, boardWidth());
+  draw(items, [...PR[cur], ...(was >= 0 && was !== cur ? PR[was] : [])], { exitLast: f.exitLast, instant: o.instant });
+  was = cur;
+  follow(items);
+}
+// keep the row being looked at on screen (below the pinned code)
+function follow(items) {
+  const ring = items.find(i => i.k === "ring:row"); if (!ring) return;
+  const b = $("#board").getBoundingClientRect(), top = b.top + ring.y, bottom = top + ring.h;
+  const safeTop = $("#codebox").getBoundingClientRect().bottom + 12, safeBottom = innerHeight - 16;
+  if (top < safeTop) scrollBy({ top: top - safeTop, behavior: "smooth" });
+  else if (bottom > safeBottom) scrollBy({ top: Math.min(bottom - safeBottom, top - safeTop), behavior: "smooth" });
 }
 
-function stop() { timer = null; }
-function go(i) {
-  stop(); stepping++; busy = rush = false; wake();
-  $("#doc").style.minHeight = "";  // a height hold left by an interrupted move
-  const was = cur, old = document.querySelector("#doc .panel:not(.ghost)");
-  cur = Math.max(0, Math.min(i, MAIN.length - 1)); F = frames(cur); sub = 0;
-  if (!old || was === cur || matchMedia("(prefers-reduced-motion: reduce)").matches) { enter = true; render(); enter = false; return; }
-  const a = anchor(was), b = anchor(cur), lo = Math.min(a.line, b.line), hi = Math.max(a.line, b.line);
-  if (a.stmt === null || a.stmt !== b.stmt || hi - lo > NEAR || !document.startViewTransition) return morphPart(old);
-  // Nearby line (like FROM then JOIN): the table on screen carries on into the next part and is
-  // altered in place, instead of one panel folding shut and another opening. The code lines it passes
-  // fade in at their new spot once the panel has moved, so nothing slides across the table.
-  const next = document.createElement("template"); next.innerHTML = F[0].body;
-  // the table on screen that carries on: the one holding the same rows, else the last one
-  const rowsOf = t => [...t.querySelectorAll("tbody tr")].map(r => r.dataset.rk).join("|");
-  const first = next.content.querySelector(".tbl"), tbls = [...old.querySelectorAll(".tbl")];
-  const last = first && tbls.find(t => rowsOf(t) === rowsOf(first)) || tbls.at(-1);
-  if (first && last) {
-    tbls.forEach(t => { if (t.dataset.vt === first.dataset.vt) t.dataset.vt = "was-" + t.dataset.vt; });
-    last.dataset.vt = first.dataset.vt;
-    last.dataset.keep = 1;
-  }
-  // The carried table is the real element, resized and moved in place (a snapshot would be stretched
-  // to the old size, so it looked like a blown-up new table instead of this one shrinking).
-  const r0 = last?.getBoundingClientRect(), f0 = last && getComputedStyle(last.querySelector("table")).fontSize;
-  const top0 = old.getBoundingClientRect().top, me = stepping, m = marks(); busy = true;
-  // the explanation is real too: it grows or shrinks to its new length and pushes the table along,
-  // instead of its new lines appearing on top of the table
-  const ex0 = old.querySelector(".p-explain"), eh0 = ex0.offsetHeight; ex0.dataset.keep = 1;
-  // hold the page height while things move: a page that got shorter mid-move would scroll by itself,
-  // which moves the real page but not the snapshots
-  const doc = $("#doc"); doc.style.minHeight = doc.offsetHeight + "px";
-  document.documentElement.classList.add("vt-ride");
-  let glide = () => [];
-  const vt = morph(() => {
-    render(false); fadeMarks(m);
-    const t1 = last && document.querySelector(`.panel .tbl[data-vt="${CSS.escape(first.dataset.vt)}"]`);
-    if (t1) t1.dataset.keep = 1;
-    const ex1 = document.querySelector("#doc .panel .p-explain"); ex1.dataset.keep = 1;
-    nameTables();
-    // Measure the final layout now (after morph() restored the scroll), but only start moving things once
-    // the browser has recorded where everything ends up; moving them earlier made it record the wrong
-    // spots, so the contents slid to the wrong place and then snapped.
-    queueMicrotask(() => {
-      const p = document.querySelector("#doc .panel"), dy = top0 - p.getBoundingClientRect().top, eh1 = ex1.offsetHeight;
-      const r1 = t1?.getBoundingClientRect(), tb = t1?.querySelector("table"), f1 = tb && getComputedStyle(tb).fontSize;
-      glide = () => {
-        // The real panel box slides from its old spot; the snapshots of what stays in it (vt-ride on the
-        // root) just ride along on it, so nothing pokes out of the box or lags behind it.
-        const wait = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--vt-wait")) * 1000 || 0;
-        const opt = { duration: 800, delay: wait, easing: "cubic-bezier(.45, 0, .25, 1)", fill: "backwards" };
-        const anims = dy ? [p.animate({ translate: [`0 ${dy}px`, "0 0"] }, opt)] : [];
-        if (eh0 !== eh1) {
-          ex1.style.overflow = "clip";
-          const a = ex1.animate({ height: [eh0 + "px", eh1 + "px"] }, opt);
-          a.finished.finally(() => ex1.style.overflow = "");
-          anims.push(a);
-        }
-        // the table's layout spot moves with the growing explanation, so that part is taken off its own offset
-        if (t1) anims.push(t1.animate([{ width: r0.width + "px", transform: `translate(${r0.left - r1.left}px, ${r0.top - r1.top - dy + eh1 - eh0}px)` },
-          { width: r1.width + "px", transform: "none" }], opt), tb.animate({ fontSize: [f0, f1] }, opt));
-        return anims.map(quick);
-      };
-    });
-    const lines = [...document.querySelector("#doc .panel").closest(".card").querySelectorAll(".line")].filter((l, j) => j > lo && j <= hi);
-    lines.forEach(l => l.style.opacity = 0);
-    // runs right after morph() has worked out the timing (--vt-grow: when everything is in place)
-    queueMicrotask(() => {
-      const at = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--vt-grow")) * 1000 || 0;
-      lines.forEach(l => { l.style.opacity = ""; quick(l.animate({ opacity: [0, 1] }, { duration: 400, delay: at, fill: "backwards" })); });
-    });
-  });
-  // the snapshots can finish before the box has slid into place, so wait for both
-  const slid = vt.ready.then(() => Promise.allSettled(glide().map(a => a.finished)), () => {});
-  Promise.allSettled([vt.finished, slid]).then(() => {
-    document.documentElement.classList.remove("vt-ride");
-    document.querySelectorAll(".panel [data-keep]").forEach(e => delete e.dataset.keep);  // next steps morph it as usual
-    if (me !== stepping) return;
-    // let the page shrink back gently, not in one jump (natural height measured before letting go)
-    const held = doc.style.minHeight, natural = doc.lastElementChild.getBoundingClientRect().bottom - doc.getBoundingClientRect().top;
-    doc.style.minHeight = "";
-    if (held) doc.animate({ minHeight: [held, natural + "px"] }, { duration: 600, easing: "cubic-bezier(.45, 0, .25, 1)" });
-    busy = rush = false;
-    document.querySelector("#doc .panel").scrollIntoView({ block: "nearest", behavior: "smooth" });
-  });
+function go(i, at = 0, o) {
+  if (i < 0 || i >= MAIN.length) return;
+  cur = i; F = PF[cur]; sub = at < 0 ? F.length - 1 : Math.min(at, F.length - 1);
+  show(o);
 }
-const NEAR = 2;  // panels at most this many code lines apart morph in place; farther ones fold and open
-// The code line a part's panel opens under.
-function anchor(i) {
-  const m = MAIN[i]; if (m.stmt === null) return { stmt: null, line: 0 };
-  const text = SC.statements[m.stmt].text;
-  return { stmt: m.stmt, line: ["change", "error"].includes(m.kind) ? text.split("\n").length - 1 : lineOf(text, range(m)[1]) };
+// Inner steps run on past the end of a part into the next one (and back), so ↓ walks the whole query.
+function step(n) {
+  if (n < 0) return go(cur - 1, -1);
+  if (n >= F.length) return go(cur + 1, 0);
+  sub = n; show();
 }
-
-// Changing parts: the old panel folds shut where it was while the new one opens under its line,
-// the page scrolls along, and the code highlight fades over, so the eye can follow the move.
-function morphPart(old) {
-  const D = 700, EASE = "cubic-bezier(.45, 0, .25, 1)", me = stepping;
-  const cards = () => [...document.querySelectorAll("#doc > .card")];
-  const card = old.closest(".card"), ci = cards().indexOf(card);
-  const li = [...card.querySelectorAll(".line")].indexOf(old.previousElementSibling);  // -1: under the card head
-  const h0 = old.getBoundingClientRect().height, y0 = scrollY;
-  const wasDim = cards().map(c => [...c.querySelectorAll(".line")].map(l => l.classList.contains("dim")));
-  const ghost = old.cloneNode(true);
-  ghost.classList.add("ghost"); ghost.inert = true;
-  [ghost, ...ghost.querySelectorAll("[style]")].forEach(e => e.style.viewTransitionName = "");
-
-  render(false);
-  const p = document.querySelector("#doc .panel"), r = p.getBoundingClientRect(), h1 = r.height;
-  // where the page should end up: the new panel in view, like scrollIntoView({block: "nearest"})
-  const top = r.top + scrollY - 70, bottom = r.bottom + scrollY + 24;
-  const y1 = bottom - innerHeight > y0 ? Math.min(top, bottom - innerHeight) : top < y0 ? top : y0;
-  const nc = cards()[ci];
-  (li >= 0 ? nc.querySelectorAll(".line")[li] : nc.querySelector(".card-head")).after(ghost);
-  scrollTo(scrollX, y0);
-
-  const shut = { height: "0px", marginTop: "0px", marginBottom: "0px", paddingTop: "0px", paddingBottom: "0px", opacity: 0 };
-  const opt = { duration: D, easing: EASE };
-  ghost.style.overflow = p.style.overflow = "clip";
-  ghost.animate([{ height: h0 + "px" }, shut], { ...opt, fill: "forwards" }).finished.then(() => ghost.remove(), () => {});
-  const grow = p.animate([shut, { height: h1 + "px" }], opt);
-  grow.finished.then(() => p.style.overflow = "", () => {});
-  cards().forEach((c, k) => c.querySelectorAll(".line").forEach((l, j) => {
-    const d = l.classList.contains("dim");
-    if (wasDim[k] && d !== wasDim[k][j]) l.querySelector(".src").animate([{ opacity: d ? 1 : .4 }, { opacity: d ? .4 : 1 }], opt);
-  }));
-  document.querySelectorAll("#doc mark.hl, #doc .badge.on").forEach(m => m.animate([{ offset: 0, backgroundColor: "transparent", boxShadow: "none" }], opt));
-  // scroll in step with the panels (reads the animation's clock, so fast-forward speeds it up too)
-  const ease = t => t < .5 ? 4 * t * t * t : 1 - (2 - 2 * t) ** 3 / 2;
-  const tick = () => {
-    if (me !== stepping) return;
-    const t = Math.min(1, (grow.currentTime ?? D) / D);
-    scrollTo(scrollX, y0 + (y1 - y0) * ease(t));
-    if (t < 1) requestAnimationFrame(tick);
-  };
-  if (y1 !== y0) requestAnimationFrame(tick);
-}
-// Inner steps morph in place: tables with the same key slide/resize, new ones fade in, old ones fade out.
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-let stepping = 0, busy = false, rush = false, wake = () => {};
-// A pause that ends early when the learner asks to fast-forward.
-const nap = ms => new Promise(r => { if (rush) return r(); const t = setTimeout(r, ms); wake = () => { clearTimeout(t); r(); }; });
-const FAST = 8;
-const quick = a => { if (rush) a.playbackRate = FAST; return a; };
-function hurry() { rush = true; wake(); document.getAnimations().forEach(a => a.playbackRate = FAST); }
-async function step(n, keepPlaying) {
-  if (!keepPlaying) stop();
-  if (busy) return hurry();  // an animation is playing: finish it quickly instead of starting another
-  n = Math.max(0, Math.min(n, F.length - 1));
-  if (n === sub) return;
-  const me = ++stepping; busy = true; rush = false;
-  try { await animateTo(n, me); } finally { if (me === stepping) { busy = false; rush = false; } }
-}
-async function animateTo(n, me) {
-  const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  // going forward, first remove rows/columns live from the table on screen
-  if (!calm && n > sub && await liveCut(n) && me !== stepping) return;  // a part change took over
-  sub = n;
-  // new JOIN rows stay hidden until flyMerge() lands their values in them
-  const old = marks(), update = () => { render(false); if (!calm) { fadeMarks(old); document.querySelectorAll(".panel tr[data-l]").forEach(tr => tr.style.opacity = 0); } nameTables(); };
-  if (!document.startViewTransition || calm) return update();
-  await morph(update).finished;
-  if (me === stepping) await flyMerge();
-}
-
-// Swap the panel's content with a view transition: same-named tables glide and resize in place.
-function morph(update) {
-  nameTables();
-  const before = boxes(), h0 = document.querySelector(".panel").offsetHeight;
-  const y = scrollY, live = [];
-  const vt = document.startViewTransition(() => {
-    update();
-    // three phases, each skipped when it has nothing to do: leave (shrink), then move, then enter (grow)
-    const after = boxes(), out = [...before.keys()].some(n => !after.has(n));
-    const moves = [...after].some(([n, b]) => before.has(n) && before.get(n) !== b);
-    const wait = out ? 0.6 : 0, move = moves ? 0.8 : 0;
-    document.documentElement.style.setProperty("--vt-wait", wait + "s");
-    document.documentElement.style.setProperty("--vt-grow", wait + move + "s");
-    // The panel itself is not a snapshot: its real height animates, so the statement box and
-    // everything below it grow and shrink along with it instead of jumping.
-    const p = document.querySelector(".panel"), h1 = p.offsetHeight;
-    if (h0 !== h1) {
-      p.style.overflow = "clip";
-      const a = quick(p.animate({ height: [h0 + "px", h1 + "px"] }, { duration: 800, delay: wait * 1000, easing: "cubic-bezier(.45, 0, .25, 1)", fill: "backwards" }));
-      a.finished.finally(() => p.style.overflow = "");
-      live.push(a);
-      scrollTo(scrollX, y);  // measuring the shorter page made the browser jump the scroll; put it back
-    }
-  });
-  vt.ready.then(() => { syncToVT(live); if (rush) hurry(); }, () => {});  // a part change can cut this short; that's expected
-  return vt;
-}
-// Real-element animations run on the same clock as the view transition's snapshots. The browser starts
-// those a few frames late, so otherwise the two drift apart mid-move (text poking out of its box).
-function syncToVT(anims) {
-  const g = document.getAnimations().find(a => a.effect?.pseudoElement?.startsWith("::view-transition-group"));
-  if (g) g.ready.then(() => anims.forEach(a => { if (a.playState !== "finished") a.startTime = g.startTime; }));
-}
-
-// When the next step shows the same table minus some rows/columns, do it on the table on screen:
-// cross the leaving rows out, then fold them away (full width, height only) and shrink leaving columns.
-async function liveCut(n) {
-  const next = document.createElement("template"); next.innerHTML = F[n].body;
-  const jobs = [];
-  document.querySelectorAll(".panel .tbl").forEach(t => {
-    const nt = next.content.querySelector(`.tbl[data-vt="${CSS.escape(t.dataset.vt)}"]`); if (!nt) return;
-    const want = {};
-    nt.querySelectorAll("tbody tr").forEach(r => want[r.dataset.rk] = (want[r.dataset.rk] || 0) + 1);
-    const rows = [...t.querySelectorAll("tbody tr")].filter(r => !(want[r.dataset.rk]-- > 0));
-    if (Object.values(want).some(c => c > 0)) return;  // the next table has rows this one lacks: not a pure cut
-    const heads = [...nt.querySelectorAll("thead th")].map(th => th.textContent);
-    const cols = [...t.querySelectorAll("thead th")].flatMap((th, k) => { const j = heads.indexOf(th.textContent); if (j < 0) return [k]; heads.splice(j, 1); return []; });
-    if (rows.length || cols.length) jobs.push({ t, rows, cols });
-  });
-  if (!jobs.length) return false;
-  const dur = { duration: 600, easing: "cubic-bezier(.45, 0, .25, 1)", fill: "forwards" };
-  const rows = jobs.flatMap(j => j.rows);
-  if (rows.length) {  // 1. a red line sweeps across each leaving row, left to right
-    const sweep = rows.flatMap(r => { r.classList.add("m-strike"); const W = r.offsetWidth;
-      return [...r.children].map(c => quick(c.animate({ backgroundSize: ["0% 2px", "100% 2px"] },
-        { duration: 500 * c.offsetWidth / W, delay: 500 * c.offsetLeft / W, fill: "both" }))); });
-    await Promise.all(sweep.map(a => a.finished)); await nap(250);
-  }
-  const fold = [];  // 2. leaving rows fold flat and leaving columns shrink, while the rest close the gap
-  rows.forEach(r => [...r.children].forEach(c => { const cs = getComputedStyle(c);  // cells squash flat as the row closes up
-    fold.push(quick(c.animate({ transform: ["scaleY(1)", "scaleY(0)"], paddingTop: [cs.paddingTop, "0px"], paddingBottom: [cs.paddingBottom, "0px"],
-      lineHeight: [cs.lineHeight, "0px"], borderBottomWidth: [cs.borderBottomWidth, "0px"], backgroundSize: ["100% 2px", "100% 0px"] }, dur))); }));
-  jobs.forEach(j => j.t.querySelectorAll("tr").forEach(r => j.cols.forEach(k => { const c = r.children[k]; if (c)
-    fold.push(quick(c.animate({ paddingLeft: [getComputedStyle(c).paddingLeft, "0px"], paddingRight: [getComputedStyle(c).paddingRight, "0px"], fontSize: [getComputedStyle(c).fontSize, "0px"] }, dur))); })));
-  await Promise.all(fold.map(a => a.finished));
-  return true;
-}
-function boxes() {
-  const m = new Map();
-  const p = document.querySelector(".panel"); if (p) m.set("panel", p.offsetHeight);
-  document.querySelectorAll(".panel [style*=view-transition-name]").forEach(e => {
-    const r = e.getBoundingClientRect(); m.set(e.style.viewTransitionName, [r.x, r.y, r.width, r.height].map(Math.round).join());
-  });
-  return m;
-}
-// Which rows/columns each table has outlined, so the next step can fade outlines in and out.
-function marks() {
-  const m = {};
-  document.querySelectorAll(".panel .tbl").forEach(t => {
-    const rows = [...t.querySelectorAll("tbody tr")], has = c => rows.flatMap((r, i) => r.classList.contains(c) ? [i] : []);
-    m[t.dataset.vt] = { cur: has("m-current"), grp: has("m-grp"),
-      sel: Object.fromEntries([...t.querySelectorAll("thead th")].flatMap((th, i) => th.classList.contains("sel") ? [[i, th.style.getPropertyValue("--w")]] : [])) };
-  });
-  return m;
-}
-function fadeMarks(old) {
-  document.querySelectorAll(".panel .tbl").forEach(t => {
-    const o = old[t.dataset.vt]; if (!o) return;
-    t.querySelectorAll("tbody tr").forEach((r, i) => {
-      for (const [c, list, was] of [["m-current", o.cur, "m-was"], ["m-grp", o.grp, "m-gw"]]) {
-        const now = r.classList.contains(c), before = list.includes(i);
-        if (now && !before) r.classList.add("hl-in");
-        if (!now && before) r.classList.add(was, "hl-out");
-      }
-    });
-    const head = [...t.querySelectorAll("thead th")], body = [...t.querySelectorAll("tbody tr")].map(r => [...r.children]);
-    head.forEach((th, k) => {
-      const cells = [th, ...body.map(r => r[k]).filter(Boolean)], now = th.classList.contains("sel"), before = k in o.sel;
-      if (now && !before) cells.forEach(c => c.classList.add("hl-in"));
-      if (!now && before) cells.forEach(c => { c.classList.add("selw", "hl-out"); c.style.setProperty("--w", o.sel[k]); });
-    });
-  });
-}
-function nameTables() {
-  const seen = {};
-  document.querySelectorAll(".panel .tbl").forEach(t => {
-    if (t.dataset.keep) return void (t.style.viewTransitionName = "");  // animated for real by go(), not as a snapshot
-    const k = (t.dataset.vt || "t").replace(/[^\w-]/g, "_");
-    t.style.viewTransitionName = `vt-${k}${seen[k] ? "-" + seen[k] : ""}`;
-    seen[k] = (seen[k] || 0) + 1;
-  });
-  const c = document.querySelector(".panel .focus-card"); if (c) c.style.viewTransitionName = "vt-card";
-  // everything in the panel is named, so the panel box itself can just grow or shrink smoothly
-  for (const [sel, n] of [["header", "vt-header"], [".panel .p-head", "vt-head"], [".panel .p-explain", "vt-explain"], [".panel .sub", "vt-sub"]]) {
-    const el = document.querySelector(sel); if (el) el.style.viewTransitionName = el.dataset.keep ? "" : n;
-  }
-}
-// Play waits for each step's animation to finish, then pauses so it can be read.
+function stop() { if (timer) { timer = null; renderHead(); } }
+// Play waits for each step's movement to finish, then pauses so it can be read.
 async function play() {
-  if (timer) { stop(); render(false); return; }
-  if (sub >= F.length - 1) sub = 0;
-  const me = timer = {}; render(false);
-  while (timer === me && sub < F.length - 1) { await sleep(1500); if (timer !== me) return; await step(sub + 1, true); }
-  if (timer === me) { stop(); render(false); }
+  if (timer) return stop();
+  const me = timer = {};
+  renderHead();
+  while (timer === me && !(cur === MAIN.length - 1 && sub === F.length - 1)) {
+    await sleep(Math.max(0, endAt - performance.now()) + 1100);
+    if (timer !== me) return;
+    step(sub + 1);
+  }
+  if (timer === me) stop();
 }
 
-// Mid-animation the browser sends every click to <html>; pass it on to the button under the pointer
-// so the arrows keep working (and fast-forward the animation).
-document.addEventListener("click", e => {
-  if (e.target !== document.documentElement || !document.querySelector(".panel")) return;
-  const b = [...document.querySelectorAll("[data-go], [data-play], [data-sub], .badge[data-i], #prev, #next")].find(el => {
-    const r = el.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; });
-  if (b && !b.disabled) b.click();
-});
-$("#prev").onclick = () => go(cur - 1);
-$("#next").onclick = () => go(cur + 1);
+$("#prev").onclick = () => { stop(); go(cur - 1); };
+$("#next").onclick = () => { stop(); go(cur + 1); };
 $("#doc").onclick = e => {
-  const b = e.target.closest(".badge[data-i]"); if (b) return go(+b.dataset.i);
-  const g = e.target.closest("[data-go]"); if (g) return step(sub + +g.dataset.go);
-  const d = e.target.closest("[data-sub]"); if (d) return step(+d.dataset.sub);
+  const b = e.target.closest(".badge[data-i]"); if (b) { stop(); return go(+b.dataset.i); }
+  const g = e.target.closest("[data-go]"); if (g) { stop(); return step(sub + +g.dataset.go); }
+  const d = e.target.closest("[data-sub]"); if (d) { stop(); return step(+d.dataset.sub); }
   if (e.target.closest("[data-play]")) play();
 };
 document.addEventListener("keydown", e => {
   if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); run(); return; }
   if (!MAIN.length || e.target.closest("textarea, input") || (e.key === " " && e.target.closest("button"))) return;
-  if (e.key === "ArrowRight") { e.preventDefault(); go(cur + 1); }
-  else if (e.key === "ArrowLeft") { e.preventDefault(); go(cur - 1); }
-  else if (e.key === "ArrowDown") { e.preventDefault(); step(sub + 1); }
-  else if (e.key === "ArrowUp") { e.preventDefault(); step(sub - 1); }
+  const keys = { ArrowRight: () => go(cur + 1), ArrowLeft: () => go(cur - 1), ArrowDown: () => step(sub + 1), ArrowUp: () => step(sub - 1) };
+  if (keys[e.key]) { e.preventDefault(); stop(); keys[e.key](); }
   else if (e.key === " ") { e.preventDefault(); play(); }
 });
+let resizing;
+addEventListener("resize", () => { clearTimeout(resizing); resizing = setTimeout(() => MAIN.length && $("#board") && show({ instant: true }), 150); });
 
 // ---------- run ----------
 const RUN_BTN = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l14 8-14 8z"/></svg><span>Run</span>`;
@@ -1145,11 +1194,15 @@ async function run() {
     if (data.error) throw new Error(data.error);
     build(data);
     if (!MAIN.length) throw new Error("There was nothing to step through.");
+    prepare();
+    timer = null; was = -1;
     $(".dock").hidden = false;
-    $("#doc").innerHTML = "";  // new query: nothing to animate from
-    go(Math.max(0, MAIN.findIndex(m => m.kind === "error")));  // an error is what the user needs to see first
+    $("#doc").innerHTML = `<div class="card codebox" id="codebox"></div>
+      <div class="card stage"><div class="stage-head" id="shead"></div><div class="board-wrap"><div id="board"></div></div></div>`;
+    clearBoard();
+    go(Math.max(0, MAIN.findIndex(m => m.kind === "error")), 0, { instant: true });  // an error is what the user needs to see first
   } catch (e) {
-    MAIN = []; stop(); stepping++; busy = false;
+    MAIN = []; timer = null;
     $(".dock").hidden = true;
     $("#doc").innerHTML = `<div class="error-box"><b>Something went wrong.</b><br>${esc(e.message)}</div>`;
   } finally {

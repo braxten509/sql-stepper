@@ -12,6 +12,7 @@ import atexit
 import json
 import os
 import re
+import shutil
 import signal
 import subprocess
 import sys
@@ -27,10 +28,13 @@ from pathlib import Path
 import pymysql
 import sqlglot
 from sqlglot import exp
+from sqlglot.dialects.mysql import MySQL
 
 HERE = Path(__file__).resolve().parent
 HOME = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share")) / "sql-stepper"
-BASE, DATA, SOCK = HOME / "mysql", HOME / "data", HOME / "mysql.sock"
+# data-ci: table names ignore case (lower_case_table_names=1), like LeetCode. MySQL only takes that
+# setting when the data folder is created, so the old case-sensitive "data" folder is replaced.
+BASE, DATA, SOCK = HOME / "mysql", HOME / "data-ci", HOME / "mysql.sock"
 MYSQL_URL = "https://cdn.mysql.com/Downloads/MySQL-8.0/mysql-8.0.46-linux-glibc2.17-x86_64-minimal.tar.xz"
 PORT = int(os.environ.get("PORT", 8765))
 MAX_ROWS = 300  # ponytail: display cap per table, raise if you step through big tables
@@ -51,10 +55,15 @@ def connect():
 
 def start_mysql():
     try:
-        connect().close()  # already running (left over from a previous session)
-        return
+        with connect() as c, c.cursor() as cur:  # already running (left over from a previous session)
+            cur.execute("SELECT @@lower_case_table_names")
+            if cur.fetchone()[0] == 1:
+                return
+            cur.execute("SHUTDOWN")  # an old case-sensitive server: replace it
+        time.sleep(2)
     except pymysql.err.OperationalError:
         pass
+    shutil.rmtree(HOME / "data", ignore_errors=True)  # the old case-sensitive folder (only scratch databases)
     if not BASE.exists():
         print("Downloading MySQL 8.0 (one time, about 60 MB)...", flush=True)
         HOME.mkdir(parents=True, exist_ok=True)
@@ -65,7 +74,7 @@ def start_mysql():
         tmp.unlink()
         next(HOME.glob("mysql-8.0.*")).rename(BASE)
     mysqld = str(BASE / "bin/mysqld")
-    common = ["--no-defaults", f"--basedir={BASE}", f"--datadir={DATA}"]
+    common = ["--no-defaults", f"--basedir={BASE}", f"--datadir={DATA}", "--lower-case-table-names=1"]
     if not DATA.exists():
         print("Setting up MySQL data folder (one time)...", flush=True)
         subprocess.run([mysqld, *common, "--initialize-insecure"], check=True, capture_output=True)
@@ -222,10 +231,99 @@ def plural(n, word):
     return f"{n} {word}{'' if n == 1 else 's'}"
 
 
+# sqlglot writes a DIV b as CAST(a / b AS SIGNED), which rounds where DIV truncates: keep DIV
+MySQL.Generator.TRANSFORMS[exp.IntDiv] = lambda g, e: f"{g.sql(e, 'this')} DIV {g.sql(e, 'expression')}"
+
+# A calculation, piece by piece: LEAF pieces are values read as they are (a column, an aggregate, a window,
+# a subquery, a CASE); any other function or operator is a step worked out from its pieces.
+LEAF = (exp.Column, exp.AggFunc, exp.Window, exp.Subquery, exp.Case, exp.If)
+NO_FRAME = {"ROW_NUMBER", "RANK", "DENSE_RANK", "PERCENT_RANK", "CUME_DIST", "NTILE", "LAG", "LEAD"}  # the rest read a frame
+
+
+def unwrap(e):
+    """(x) and sqlglot's hidden type wrappers (YEAR(d) holds d inside one) show as x."""
+    while True:
+        kids = list(e.iter_expressions())
+        hidden = type(e).__name__.startswith("TsOrDs") or (len(kids) == 1 and not isinstance(e, LEAF) and e.sql("mysql") == kids[0].sql("mysql"))
+        if isinstance(e, exp.Paren) or hidden:
+            e = kids[0]
+        else:
+            return e
+
+
+def is_step(e):
+    # a constant like -1 stays as text; NOW() and friends still count (their value changes)
+    return isinstance(e, (exp.Func, exp.Binary, exp.Unary, exp.In, exp.Between)) and not isinstance(e, LEAF + (exp.Paren,)) \
+        and (e.find(*LEAF) is not None or (isinstance(e, exp.Func) and not list(e.iter_expressions())))
+
+
+def calc_steps(top, text, ref):
+    """Each step of a calculation, innermost first: its text with its pieces as __A0__, __A1__... (ref gives
+    the extra column that holds each piece's value per row), and where its own value is."""
+    steps = []
+
+    def visit(e):
+        e = unwrap(e)
+        if not is_step(e) or len(steps) >= 20:  # ponytail: 20 steps per column; a longer formula shows its first 20
+            return
+        for c in e.iter_expressions():
+            visit(c)
+        c, args = e.copy(), []
+        for orig, cp in zip(list(e.iter_expressions()), list(c.iter_expressions())):
+            b = unwrap(orig)
+            if isinstance(b, LEAF) or is_step(b):
+                cp.replace(exp.Var(this=f"__A{len(args)}__"))
+                args.append(ref(b.sql("mysql")))
+        tpl, m = c.sql("mysql"), e.meta
+        if isinstance(e, exp.Func) and "start" in m and text:  # IFNULL, not the COALESCE sqlglot writes
+            name = text[m["start"]:m["end"] + 1]
+            if tpl.upper().startswith(e.sql_name() + "(") and re.fullmatch(r"\w+", name):
+                tpl = name + tpl[len(e.sql_name()):]
+        steps.append({"tpl": tpl, "args": args, "at": ref(e.sql("mysql"))})
+
+    visit(top)
+    return steps
+
+
+def window_detail(w, ref):
+    """What the page needs to replay a window function: each row's partition and place in the sorted
+    order, the value it reads, and (for functions that read a frame) the last row of its frame and its size."""
+    f = w.this
+    part = [p.sql("mysql") for p in w.args.get("partition_by") or []]
+    order = w.args.get("order")
+    ords = order.expressions if order else []
+    over = (f"PARTITION BY {', '.join(part)} " if part else "") + (f"ORDER BY {', '.join(o.sql('mysql') for o in ords)}" if ords else "")
+    d = {"fn": f.name.upper() if isinstance(f, exp.Anonymous) else f.sql_name(), "sql": w.sql("mysql"),
+         "part": part, "order": [{"sql": o.this.sql("mysql"), "desc": bool(o.args.get("desc"))} for o in ords],
+         "spec": w.args["spec"].sql("mysql") if w.args.get("spec") else None,
+         "res": ref(w.sql("mysql")), "pos": ref(f"ROW_NUMBER() OVER ({over})"),
+         "pvals": [ref(p) for p in part], "ovals": [ref(o.this.sql("mysql")) for o in ords]}
+    if part:
+        d["pid"] = ref(f"DENSE_RANK() OVER (ORDER BY {', '.join(part)})")
+    this = f.args.get("this")
+    if d["fn"] == "NTILE":
+        d["n"] = this.sql("mysql")
+    elif isinstance(this, exp.Expression) and not isinstance(this, (exp.Star, exp.Literal)):
+        d["argsql"], d["arg"] = this.sql("mysql"), ref(this.sql("mysql"))
+    for k in ("offset", "default"):
+        if isinstance(f.args.get(k), exp.Expression):
+            d[k] = f.args[k].sql("mysql")
+    if d["fn"] not in NO_FRAME:  # the frame: COUNT(*) over it is its size; counted from the start it ends at the last row
+        cnt = w.copy()
+        cnt.set("this", exp.Count(this=exp.Star()))
+        d["size"] = ref(cnt.sql("mysql"))
+        spec = cnt.args.get("spec")
+        if spec:
+            spec.set("start", "UNBOUNDED")
+            spec.set("start_side", "PRECEDING")
+        d["hi"] = ref(cnt.sql("mysql"))
+    return d
+
+
 COMPARE = (exp.EQ, exp.NEQ, exp.GT, exp.GTE, exp.LT, exp.LTE, exp.Like, exp.NullSafeEQ, exp.Is)
 
 
-def checks(cond):
+def checks(cond, text=""):
     """Split a condition into its simple checks (one AND or OR chain) so each row can show its own values.
     Returns (detail, extra SELECT columns). Per check the extra columns are: its truth, then the left
     value, then the right value (the values only for comparisons)."""
@@ -239,7 +337,11 @@ def checks(cond):
         else:
             leaves.append(e)
     walk(cond)
-    out, cols = [], []
+    out, cols, tail = [], [], []
+
+    def ref(sql):  # values the calculation steps read go after the checks' own columns
+        tail.append(f"({sql})")
+        return len(tail) - 1
     for p in leaves:
         core, d = p.unnest(), {"sql": p.sql("mysql")}
         cols.append(f"({d['sql']})")
@@ -255,8 +357,16 @@ def checks(cond):
                 d["rest"] = full[len(left):].strip()  # e.g. "IN (SELECT p_id FROM Tree)"
                 if isinstance(core, exp.In) and core.args.get("query"):
                     d["query"] = core.args["query"].unnest().sql("mysql")  # Stepper.fill_lists runs it
+            # YEAR(d) = 2020: also show how YEAR(d) came out
+            sides = [core.this] + ([core.expression] if isinstance(core, COMPARE) and core.expression else [])
+            calc = [st for side in sides for st in calc_steps(side, text, ref)]
+            if calc:
+                d["calc"] = calc
         out.append(d)
-    return {"combine": kind.key.upper() if kind else None, "checks": out}, cols
+    for d in out:  # tail positions count from the first check column
+        for st in d.get("calc", []):
+            st["args"], st["at"] = [a + len(cols) for a in st["args"]], st["at"] + len(cols)
+    return {"combine": kind.key.upper() if kind else None, "checks": out}, cols + tail
 
 
 def owner_query(node):
@@ -268,7 +378,7 @@ def owner_query(node):
 
 class Stepper:
     def __init__(self, cur):
-        self.cur, self.steps = cur, []
+        self.cur, self.steps, self.text = cur, [], ""
 
     def run(self, sql):
         self.cur.execute(sql)
@@ -287,6 +397,7 @@ class Stepper:
     # --- one top-level statement ---
 
     def statement(self, text, i):
+        self.text = text  # parsed nodes point into this (function names as the user wrote them)
         try:
             node = sqlglot.parse_one(text, read="mysql")
         except sqlglot.errors.SqlglotError:
@@ -316,7 +427,7 @@ class Stepper:
         after = self.snapshot()
         tbl = node.this if isinstance(node, (exp.Update, exp.Delete)) and isinstance(node.this, exp.Table) else \
             node.find(exp.Table) if node else None  # DELETE p1 FROM Person p1: name the real table
-        t = tbl.name if tbl else "the table"
+        t = tbl.name.lower() if tbl else "the table"  # lower_case_table_names=1 stores names lowercased
         if isinstance(node, exp.Insert):
             msg = f"INSERT added {plural(n, 'row')} to {t}. New rows are green."
         elif isinstance(node, exp.Update):
@@ -346,12 +457,12 @@ class Stepper:
         """Before running an UPDATE/DELETE: which rows of the target table will it touch?"""
         this = node.this
         sources = [this] + [j.this for j in this.args.get("joins") or []]
-        real = {s.alias_or_name: s.name for s in sources if isinstance(s, exp.Table)}
+        real = {s.alias_or_name.lower(): s.name.lower() for s in sources if isinstance(s, exp.Table)}  # names ignore case
         if isinstance(node, exp.Update):
             target = node.expressions[0].this.table or this.alias_or_name
         else:
             target = node.args["tables"][0].alias_or_name if node.args.get("tables") else this.alias_or_name
-        table = real[target]
+        table = real[target.lower()]
         cols, brows = self.snapshot()[table]
         tail = " ".join(node.args[k].sql("mysql") for k in ("where", "order", "limit") if node.args.get(k))
         _, found = self.run(f"SELECT {'DISTINCT ' if len(sources) > 1 else ''}`{target}`.* FROM {this.sql('mysql')} {tail}")
@@ -364,7 +475,7 @@ class Stepper:
             positions.append(pos)
         det, where = None, node.args.get("where")
         if where and len(sources) == 1 and not node.args.get("limit"):
-            det, pcols = checks(where.this)
+            det, pcols = checks(where.this, self.text)
             self.fill_lists(det, "")
             _, rows2 = self.run(f"SELECT `{target}`.*, {', '.join(pcols)} FROM {this.sql('mysql')}")
             if [r[:len(cols)] for r in rows2] == brows:  # same row order as the snapshot, so they line up
@@ -503,9 +614,9 @@ class Stepper:
             else:
                 desc = f"pairs rows with rows of {tname} where the ON condition is true. Rows with no match are dropped."
             src = sources[k]
-            if isinstance(src, exp.Table) and src.name in [x.name for x in sources[:k] if isinstance(x, exp.Table)]:
+            if isinstance(src, exp.Table) and src.name.lower() in [x.name.lower() for x in sources[:k] if isinstance(x, exp.Table)]:
                 desc += f" ({src.name} is the same stored table read a second time, under the name {tname}.)"
-            det, pcols = checks(on) if isinstance(on, exp.Expression) else ({"checks": []}, [])
+            det, pcols = checks(on, self.text) if isinstance(on, exp.Expression) else ({"checks": []}, [])
             self.fill_lists(det, pre)
             step(f"{pre}SELECT {', '.join(f'`{a}`.*' for a in names[:k + 1])}{''.join(', ' + c for c in pcols)} {body}",
                  j.sql("mysql").lstrip(", "),
@@ -518,7 +629,7 @@ class Stepper:
 
         if where:
             self.subqueries(where, base, pre, scope_ctes, sub("subquery in WHERE"), stmt)
-            det, pcols = checks(where.this)
+            det, pcols = checks(where.this, self.text)
             self.fill_lists(det, pre)
             step(f"{pre}SELECT {star}, ({where.this.sql('mysql')}) IS TRUE AS `__keep`, {', '.join(pcols)} {body}",
                  where.sql("mysql"),
@@ -567,7 +678,7 @@ class Stepper:
             h = resolve(having.this)
             aggs = list(dict.fromkeys(a.sql("mysql") for a in h.find_all(exp.AggFunc)))
             cols = ", ".join(keys + aggs)
-            det, pcols = checks(h)
+            det, pcols = checks(h, self.text)
             self.fill_lists(det, pre)
             step(f"{pre}SELECT {cols + ', ' if cols else ''}({h.sql('mysql')}) IS TRUE AS `__keep`, {', '.join(pcols)} {body}"
                  + (f" GROUP BY {', '.join(keys)}" if keys else ""), having.sql("mysql"),
@@ -588,7 +699,7 @@ class Stepper:
             notes.append("There is an aggregate but no GROUP BY, so all rows are treated as one group.")
         if any(e.find(exp.Case) for e in base.expressions):
             notes.append("CASE is checked top to bottom for each row, and the first WHEN that is true wins.")
-        cols_txt = ", ".join(e.alias_or_name or e.sql("mysql") for e in base.expressions)
+        cols_txt = ", ".join(e.alias if isinstance(e, exp.Alias) else e.sql("mysql") for e in base.expressions)
         n = step(final_sql if not later else pre + q.sql("mysql"), "SELECT " + cols_txt,
                  lambda n, p: f"SELECT now builds the output columns ({cols_txt}). " + " ".join(notes) +
                               (done(n) if not later else ""), final=not later)
@@ -623,27 +734,49 @@ class Stepper:
                     pass  # correlated: the list depends on the outer row
 
     def select_detail(self, base, q, pre):
-        """Per output column: its expression, and for CASE which WHEN each row hit."""
-        cols, extra = [], []
+        """Per output column: its expression, and per row how its value came out: for CASE which WHEN hit,
+        for a calculation each step's value, for a window function the rows it read."""
+        cols, extra, seen = [], [], {}
+
+        def ref(sql):  # the extra column holding this value for each row
+            if sql not in seen:
+                seen[sql] = len(extra)
+                extra.append(f"({sql})")
+            return seen[sql]
         for e in base.expressions:
             inner = e.unalias()
-            d = {"name": e.alias_or_name or e.sql("mysql"), "sql": inner.sql("mysql"), "star": isinstance(inner, exp.Star),
+            d = {"name": e.alias_or_name or e.sql("mysql"), "sql": inner.sql("mysql"), "alias": isinstance(e, exp.Alias), "star": isinstance(inner, exp.Star),
                  "window": bool(inner.find(exp.Window)),
                  "agg": any(not a.find_ancestor(exp.Window, exp.Subquery) for a in inner.find_all(exp.AggFunc))}
-            if isinstance(inner, exp.Case):
-                d["case"] = {"else": inner.args["default"].sql("mysql") if inner.args.get("default") else "NULL",
-                             "operand": inner.this.sql("mysql") if inner.this else None, "branches": []}
-                for iff in inner.args.get("ifs") or []:
-                    cond = exp.EQ(this=inner.this.copy(), expression=iff.this.copy()) if inner.this else iff.this
-                    det, pcols = checks(cond)
+            if isinstance(inner, (exp.Case, exp.If)):
+                # IF(c, a, IF(c2, b, d)) reads like CASE WHEN c THEN a WHEN c2 THEN b ELSE d
+                ifs, tail = [], inner
+                while isinstance(tail, exp.If):
+                    ifs.append(exp.If(this=tail.this.copy(), true=tail.args["true"].copy()))
+                    tail = tail.args.get("false")
+                if isinstance(inner, exp.Case):
+                    ifs, tail = inner.args.get("ifs") or [], inner.args.get("default")
+                d["case"] = {"else": tail.sql("mysql") if tail else "NULL", "if": isinstance(inner, exp.If),
+                             "operand": inner.this.sql("mysql") if isinstance(inner, exp.Case) and inner.this else None,
+                             "branches": []}
+                for iff in ifs:
+                    cond = exp.EQ(this=inner.this.copy(), expression=iff.this.copy()) if d["case"]["operand"] else iff.this
+                    det, pcols = checks(cond, self.text)
                     self.fill_lists(det, pre)
                     # per branch: its overall result (1, 0 or NULL), then its checks' columns
                     d["case"]["branches"].append({"when": iff.this.sql("mysql"), "then": iff.args["true"].sql("mysql"),
                                                   "offset": len(extra), **det})
                     extra += [f"({cond.sql('mysql')})", *pcols]
+            else:
+                windows = [w for w in inner.find_all(exp.Window) if not w.find_ancestor(exp.Subquery)]
+                if windows and not any(w.args.get("alias") for w in windows):  # ponytail: OVER w (named) shows no replay
+                    d["windows"] = [window_detail(w, ref) for w in windows]
+                steps = calc_steps(inner, self.text, ref)
+                if steps:
+                    d["calc"] = steps
             cols.append(d)
         detail = {"type": "select", "cols": cols}
-        if extra:  # run once more with the WHEN checks, then line those rows up with the shown rows by value
+        if extra:  # run once more with the extra values, then line those rows up with the shown rows by value
             q2 = q.copy()
             for x in extra:
                 q2.append("expressions", sqlglot.parse_one(x, read="mysql"))
@@ -651,10 +784,10 @@ class Stepper:
                 _, rows = self.run(pre + q2.sql("mysql"))
                 shown = [tuple(r["v"]) for r in self.steps[-1]["tables"][0]["rows"]]
                 pool = [(tuple(cell(x) for x in r[:-len(extra)]), [cell(x) for x in r[-len(extra):]]) for r in rows]
-                detail["case_rows"] = []
+                detail["extra_rows"] = []
                 for v in shown:
                     k = next((k for k, (pv, _) in enumerate(pool) if pv == v), None)
-                    detail["case_rows"].append(pool.pop(k)[1] if k is not None else None)
+                    detail["extra_rows"].append(pool.pop(k)[1] if k is not None else None)
             except pymysql.MySQLError:
                 pass
         self.steps[-1]["detail"] = detail
