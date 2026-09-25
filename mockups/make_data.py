@@ -38,10 +38,17 @@ WHERE e.salary > 65000
 ORDER BY e.name;"""
 
 start_mysql()
-out = [{"name": name, "setup": setup, "code": code, **run_all(setup, code)}
-       for name, setup, code in [("Tree node types (CASE + subquery)", TREE_SETUP, TREE_CODE),
-                                 ("Raise, then department report (UPDATE + GROUP BY)", EMP_SETUP, EMP_CODE),
-                                 ("Employees and managers (LEFT JOIN)", EMP_SETUP, JOIN_CODE)]]
+out = [
+    {"name": name, "setup": setup, "code": code, **run_all(setup, code)}
+    for name, setup, code in [
+        ("Tree node types (CASE + subquery)", TREE_SETUP, TREE_CODE),
+        ("Raise, then department report (UPDATE + GROUP BY)", EMP_SETUP, EMP_CODE),
+        ("Employees and managers (LEFT JOIN)", EMP_SETUP, JOIN_CODE),
+    ]
+]
 Path(__file__).with_name("data.js").write_text(
-    "// Real step data from app.py run_all(). Rebuild with mockups/make_data.py\nwindow.SCENARIOS = " + json.dumps(out, indent=1) + ";\n")
+    "// Real step data from app.py run_all(). Rebuild with mockups/make_data.py\nwindow.SCENARIOS = "
+    + json.dumps(out, indent=1)
+    + ";\n"
+)
 print("wrote", [len(s["steps"]) for s in out], "steps")

@@ -5,3 +5,13 @@ mockups
 .claude-flow
 agentdb.rvf*
 ruvector.db
+
+.ruff_cache
+.pytest_cache
+*.py[cod]
+*.rvf
+*.rvf.*
+ruvector.db-*
+.env
+.env.*
+*.log

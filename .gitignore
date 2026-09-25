@@ -4,3 +4,30 @@ __pycache__/
 agentdb.rvf*
 ruvector.db
 .wrangler/
+
+# Python tooling and generated files
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+build/
+dist/
+*.egg-info/
+# Local databases and sidecars (no database fixtures are tracked)
+*.rvf
+*.rvf.*
+ruvector.db-*
+# Secrets, logs and machine-local files
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/

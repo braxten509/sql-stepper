@@ -255,7 +255,7 @@ body.chatting main { margin-right: 400px; }
 .starters { margin-top: auto; display: flex; flex-direction: column; gap: 8px; }
 .starters p { margin: 0 0 4px; color: var(--muted); font-size: 13px; }
 .starters .btn { justify-content: flex-start; height: auto; padding: 8px 12px; text-align: left; }
-#chat-form { display: flex; align-items: flex-end; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); }
+#chat-form { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); }
 #ask-in { flex: 1; resize: none; max-height: 140px; padding: 8px 10px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--panel-2); color: var(--text); font: 13.5px/1.45 var(--sans); }
 #ask-in:focus { outline: none; border-color: var(--accent); }
 @media (max-width: 1000px) { #chat { width: 100%; } body.chatting main { margin-right: 0; } }
@@ -1369,7 +1369,7 @@ function onScreen() {
 function drawChat() {
   const box = $("#msgs"), err = MAIN.some(m => m.kind === "error");
   const starters = [err ? "What does this error mean, and how do I fix it?" : "Explain the step I'm looking at",
-    "Why doesn't my query give the right answer?", "Is there a simpler way to write this?"];
+    "Why doesn't my query give the right answer?", "Can I get a hint?"];
   box.innerHTML = CHAT.length ? CHAT.map((m, i) => m.role === "user" ? `<div class="msg user">${esc(m.content)}</div>`
       : `<div class="msg ai${m.err ? " err" : ""}${asking && i === CHAT.length - 1 ? " typing" : ""}">${m.err ? esc(m.content) : md(m.content)}</div>`).join("")
     : `<div class="starters"><p>Ask anything about your SQL. I can see your schema, your code, and the step you're on.</p>${starters.map(q => `<button class="btn" data-q="${esc(q)}">${esc(q)}</button>`).join("")}</div>`;
