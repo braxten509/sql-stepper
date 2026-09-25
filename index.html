@@ -57,7 +57,8 @@ mark.hl { background: var(--accent-bg); color: inherit; border-radius: 4px; box-
 
 /* numbered badges */
 .badge { display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 6px; border-radius: 99px; font: 700 11.5px var(--mono); border: 1.5px solid var(--line-2); color: var(--muted); background: var(--panel); cursor: pointer; transition: transform .12s, background .12s; }
-.badge:hover { transform: scale(1.1); }
+.badge:hover { transform: scale(1.12); }
+.badge:not(.on):hover { border-color: var(--accent); color: var(--accent); }
 .badge.done { border-color: color-mix(in srgb, var(--accent) 55%, transparent); color: var(--accent); }
 .badge.on { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 0 0 4px var(--accent-bg); }
 .badge[data-kind=change] { border-style: dashed; }
@@ -231,6 +232,10 @@ textarea:focus-visible { outline: none; }
 }
 @media (max-width: 640px) {
   .brand-name, .dock .label { display: none; }
+  .dock .t, #ask span { display: none; }  /* symbols only: ‹ › ▶ » */
+  header { gap: 8px; padding: 0 10px; }
+  .dock, .actions { gap: 6px; }
+  .dock .btn { width: auto; padding: 0 10px; }
   .board-wrap { padding: 12px; }
 }
 @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
@@ -272,10 +277,11 @@ body.chatting main { margin-right: 400px; }
     <span class="brand-name">SQL Stepper <small>MySQL 8.0</small></span>
   </div>
   <div class="dock" hidden>
-    <button class="btn" id="prev" aria-label="Previous part">‹ Back</button>
+    <button class="btn" id="prev" aria-label="Previous step">‹ <span class="t">Back</span></button>
     <div class="label" id="label"></div>
-    <button class="btn primary" id="next" aria-label="Next part">Next part ›</button>
-    <button class="btn" id="end" aria-label="Skip to the end">Skip to end »</button>
+    <button class="btn primary" id="next" aria-label="Next step"><span class="t">Next</span> ›</button>
+    <button class="btn" id="play" aria-label="Play">▶ <span class="t">Play</span></button>
+    <button class="btn" id="end" aria-label="Skip to the end"><span class="t">Skip to end</span> »</button>
   </div>
   <div class="actions">
     <a class="src-link" href="https://github.com/braxten509/sql-stepper" target="_blank" rel="noopener">Source code</a>
@@ -1155,7 +1161,7 @@ function range(s) {
 
 // ---------- rendering ----------
 let cur = 0, sub = 0, timer = null, F = [];
-const badge = i => `<button class="badge ${i === cur ? "on" : i < cur ? "done" : ""}" data-i="${i}" data-kind="${MAIN[i].kind}" title="${esc(MAIN[i].title)}">${i + 1}</button>`;
+const badge = i => `<button class="badge ${i === cur ? "on" : i < cur ? "done" : ""}" data-i="${i}" data-kind="${MAIN[i].kind}" title="Part ${i + 1}: ${esc(MAIN[i].title)}">${i + 1}</button>`;
 
 function flow(k) {
   const s = MAIN[k], t = s.tables[0], p = feeder(k);
@@ -1218,15 +1224,13 @@ function renderCode() {
 function renderHead() {
   const s = MAIN[cur], f = F[sub], head = $("#shead");
   const dots = F.length > 1 ? F.map((x, i) => `<button class="${i === sub ? "on" : i < sub ? "done" : ""} ${x.end ? "end" : ""}" data-sub="${i}" title="${esc(x.label || "")}"></button>`).join("") : "";
-  const first = cur === 0 && sub === 0, lastStep = cur === MAIN.length - 1 && sub === F.length - 1;
   const h0 = head.offsetHeight;
+  $("#play").innerHTML = timer ? `❚❚ <span class="t">Pause</span>` : `▶ <span class="t">Play</span>`;
+  $("#play").ariaLabel = timer ? "Pause" : "Play";
   $(".stage").dataset.kind = s.kind;
   head.innerHTML = `<div class="p-head"><span class="p-title">${esc(s.title)}</span>${s.scope ? `<span class="p-scope">${esc(s.scope)}</span>` : ""}<span class="p-flow">${flow(cur)}</span></div>
     <div class="p-explain">${brief(s)}</div>
     <div class="sub">
-      <button class="btn" data-go="-1" aria-label="Previous step" ${first ? "disabled" : ""}>↑</button>
-      <button class="btn" data-go="1" aria-label="Next step" ${lastStep ? "disabled" : ""}>↓</button>
-      <button class="btn" data-play>${timer ? "❚❚ Pause" : "▶ Play"}</button>
       ${f.label ? `<span class="label">${esc(f.label)}${f.sub ? `<small>${esc(f.sub)}</small>` : ""}</span>` : ""}
       <div class="dots">${dots}</div></div>
     ${f.card ? `<div class="focus-card">${f.card}</div>` : ""}`;
@@ -1240,10 +1244,11 @@ let was = -1;  // the part shown before, so a move between two parts can use bot
 function show(o = {}) {
   const f = F[sub];
   renderCode(); renderHead();
-  $("#label").textContent = `Part ${cur + 1} of ${MAIN.length}`;
-  $("#prev").disabled = cur === 0;
-  $("#next").disabled = cur === MAIN.length - 1;
-  $("#end").disabled = cur === MAIN.length - 1 && sub === F.length - 1;
+  // one set of controls: Back / Next walk every step, running on into the next part
+  const last = cur === MAIN.length - 1 && sub === F.length - 1;
+  $("#label").textContent = (F.length > 1 ? `Step ${sub + 1} of ${F.length} · ` : "") + `Part ${cur + 1} of ${MAIN.length}`;
+  $("#prev").disabled = cur === 0 && sub === 0;
+  $("#next").disabled = $("#play").disabled = $("#end").disabled = last;
   const items = layout(f.view, boardWidth());
   draw(items, [...PR[cur], ...(was >= 0 && was !== cur ? PR[was] : [])], { exitLast: f.exitLast, instant: o.instant });
   was = cur;
@@ -1284,8 +1289,9 @@ async function play() {
   if (timer === me) stop();
 }
 
-$("#prev").onclick = () => { stop(); go(cur - 1); };
-$("#next").onclick = () => { stop(); go(cur + 1); };
+$("#prev").onclick = () => { stop(); step(sub - 1); };
+$("#next").onclick = () => { stop(); step(sub + 1); };
+$("#play").onclick = () => play();
 $("#end").onclick = () => { stop(); go(MAIN.length - 1, -1); };  // the last part, at its last step
 function openHidden(id, col) {
   const h = HID.get(id); if (!h) return;
@@ -1306,15 +1312,14 @@ $("#hid").onclick = e => { if (e.target === $("#hid") || e.target.closest("#hid-
 $("#doc").onclick = e => {
   const m = e.target.closest("[data-hid]"); if (m) return openHidden(+m.dataset.hid, m.dataset.col);
   const b = e.target.closest(".badge[data-i]"); if (b) { stop(); return go(+b.dataset.i); }
-  const g = e.target.closest("[data-go]"); if (g) { stop(); return step(sub + +g.dataset.go); }
   const d = e.target.closest("[data-sub]"); if (d) { stop(); return step(+d.dataset.sub); }
-  if (e.target.closest("[data-play]")) play();
 };
 document.addEventListener("keydown", e => {
   if (e.target.closest("#chat")) return;
   if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); run(); return; }
   if (!MAIN.length || e.target.closest("textarea, input") || (e.key === " " && e.target.closest("button"))) return;
-  const keys = { ArrowRight: () => go(cur + 1), ArrowLeft: () => go(cur - 1), ArrowDown: () => step(sub + 1), ArrowUp: () => step(sub - 1) };
+  // left/right step like Back / Next; up/down jump a whole part
+  const keys = { ArrowRight: () => step(sub + 1), ArrowLeft: () => step(sub - 1), ArrowDown: () => go(cur + 1), ArrowUp: () => go(cur - 1) };
   if (keys[e.key]) { e.preventDefault(); stop(); keys[e.key](); }
   else if (e.key === " ") { e.preventDefault(); play(); }
 });
