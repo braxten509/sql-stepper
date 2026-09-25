@@ -1161,7 +1161,7 @@ function range(s) {
 
 // ---------- rendering ----------
 let cur = 0, sub = 0, timer = null, F = [];
-const badge = i => `<button class="badge ${i === cur ? "on" : i < cur ? "done" : ""}" data-i="${i}" data-kind="${MAIN[i].kind}" title="Part ${i + 1}: ${esc(MAIN[i].title)}">${i + 1}</button>`;
+const badge = i => `<button class="badge ${i === cur ? "on" : i < cur ? "done" : ""}" data-i="${i}" data-kind="${MAIN[i].kind}" title="Step ${i + 1}: ${esc(MAIN[i].title)}">${i + 1}</button>`;
 
 function flow(k) {
   const s = MAIN[k], t = s.tables[0], p = feeder(k);
@@ -1246,7 +1246,8 @@ function show(o = {}) {
   renderCode(); renderHead();
   // one set of controls: Back / Next walk every step, running on into the next part
   const last = cur === MAIN.length - 1 && sub === F.length - 1;
-  $("#label").textContent = (F.length > 1 ? `Step ${sub + 1} of ${F.length} · ` : "") + `Part ${cur + 1} of ${MAIN.length}`;
+  // a Step is each numbered bubble; a Part is each small movement inside it
+  $("#label").textContent = `Step ${cur + 1} of ${MAIN.length}` + (F.length > 1 ? ` · Part ${sub + 1} of ${F.length}` : "");
   $("#prev").disabled = cur === 0 && sub === 0;
   $("#next").disabled = $("#play").disabled = $("#end").disabled = last;
   const items = layout(f.view, boardWidth());
@@ -1378,7 +1379,7 @@ function onScreen() {
   const s = MAIN[cur], f = F[sub];
   const tables = (s.tables || []).map(t => `Table ${t.name || ""} (${t.cols.join(", ")}):\n` +
     t.rows.slice(0, 30).map(r => r.v.map(v => v === null ? "NULL" : v).join(" | ") + (r.m ? `   [${r.m}]` : "")).join("\n")).join("\n\n");
-  c.step = `part ${cur + 1} of ${MAIN.length}, "${s.title}"${s.scope ? ` (inside ${s.scope})` : ""}${f && f.label ? `, at "${f.label}"` : ""}. ` +
+  c.step = `step ${cur + 1} of ${MAIN.length}, "${s.title}"${s.scope ? ` (inside ${s.scope})` : ""}${f && f.label ? `, at "${f.label}"` : ""}. ` +
     `${s.kind === "error" ? "MySQL ERROR: " : ""}${s.explain || ""}\n${tables}`;
   return c;
 }
