@@ -1169,6 +1169,8 @@ def chat_prompt(data):
     c = data.get("context") or {}
     # size caps keep the worst question to about 25k tokens in, so under half a cent
     screen = f"Schema:\n```sql\n{str(c.get('setup', ''))[:12000]}\n```\nCode:\n```sql\n{str(c.get('code', ''))[:8000]}\n```"
+    if str(c.get("instructions", "")).strip():
+        screen = f"The problem they're solving:\n{str(c['instructions'])[:6000]}\n\n" + screen
     if c.get("step"):
         screen += f"\nThey are looking at this step: {str(c['step'])[:6000]}"
     msgs = [{"role": "system", "content": CHAT_RULES + "\n\n" + screen}]

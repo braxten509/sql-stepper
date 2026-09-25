@@ -188,13 +188,25 @@ header { position: sticky; top: 0; z-index: 10; height: 52px; display: grid; gri
 .spin { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 main { display: grid; grid-template-columns: minmax(300px, 30%) 1fr; align-items: start; }
-.side { position: sticky; top: 52px; height: calc(100vh - 52px); display: grid; grid-template-rows: minmax(120px, 40%) 1fr; gap: 12px; padding: 14px 16px 16px; border-right: 1px solid var(--line); }
+.side { position: sticky; top: 52px; height: calc(100vh - 52px); display: flex; flex-direction: column; gap: 12px; padding: 14px 16px 16px; border-right: 1px solid var(--line); }
 .view { min-width: 0; padding: 12px 24px 40px; }
 
 /* ---------- editors ---------- */
-.ed-wrap { display: flex; flex-direction: column; min-height: 0; }
-.ed-label { font-size: 12px; font-weight: 600; margin-bottom: 6px; display: flex; justify-content: space-between; }
-.ed-label span { color: var(--muted); font-weight: 400; }
+/* open boxes share the height: schema 4, instructions 3, code 5; a folded box is just its label */
+.ed-wrap { display: flex; flex-direction: column; min-height: 110px; flex: 4 1 0; }
+.ed-wrap.notes { flex-grow: 3; }
+.ed-wrap.main { flex-grow: 5; }
+.ed-wrap.closed { flex: 0 0 auto; min-height: 0; }
+.ed-wrap.closed .editor { display: none; }
+.ed-label { font-size: 12px; font-weight: 600; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+.ed-label span { margin-left: auto; color: var(--muted); font-weight: 400; }
+button.ed-label { width: 100%; padding: 0; border: 0; background: none; color: inherit; font-family: inherit; cursor: pointer; text-align: left; }
+.ed-wrap.closed .ed-label { margin-bottom: 0; }
+button.ed-label::before { content: ""; width: 6px; height: 6px; margin: 0 2px 0 1px; border: solid var(--muted); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg) translate(-2px, -1px); transition: transform .15s; }
+.ed-wrap.closed button.ed-label::before { transform: rotate(-45deg); }
+button.ed-label:hover::before { border-color: var(--text); }
+button.ed-label:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.editor.plain textarea { color: var(--text); font: 13px/1.55 var(--sans); white-space: pre-wrap; }
 .editor { position: relative; flex: 1; min-height: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); overflow: hidden; transition: border-color .15s; }
 .editor:focus-within { border-color: var(--accent); }
 .editor pre, .editor textarea { position: absolute; inset: 0; margin: 0; padding: 12px 14px; font: 13px/1.6 var(--mono); white-space: pre-wrap; word-wrap: break-word; overflow: auto; tab-size: 2; }
@@ -269,11 +281,15 @@ body.chatting main { margin-right: 400px; }
 </header>
 <main>
   <section class="side">
-    <div class="ed-wrap">
-      <div class="ed-label">Schema <span>starting tables and data</span></div>
+    <div class="ed-wrap" data-fold="setup">
+      <button class="ed-label" aria-expanded="true">Schema <span>starting tables and data</span></button>
       <div class="editor"><pre aria-hidden="true"></pre><textarea id="setup" spellcheck="false" aria-label="Schema SQL" placeholder="CREATE TABLE ... / INSERT INTO ..."></textarea></div>
     </div>
-    <div class="ed-wrap">
+    <div class="ed-wrap notes closed" data-fold="notes">
+      <button class="ed-label" aria-expanded="false">Instructions <span id="notes-sub">the problem, optional</span></button>
+      <div class="editor plain"><textarea id="notes" spellcheck="true" aria-label="Instructions" placeholder="Paste the problem description here (optional). The AI helper reads it too."></textarea></div>
+    </div>
+    <div class="ed-wrap main">
       <div class="ed-label">Your code <span>what to step through</span></div>
       <div class="editor"><pre aria-hidden="true"></pre><textarea id="code" spellcheck="false" aria-label="Your SQL" placeholder="SELECT ... / UPDATE ... / DELETE ..."></textarea></div>
     </div>
@@ -350,6 +366,19 @@ const DEFAULT_CODE = `SELECT id,
 FROM Tree
 ORDER BY id;`;
 function store(k, v) { try { v === undefined ? (v = localStorage.getItem(k)) : localStorage.setItem(k, v); } catch { v = null; } return v; }
+// Schema and Instructions fold open and shut (remembered); Instructions starts folded
+for (const w of document.querySelectorAll("[data-fold]")) {
+  const k = "sqlstepper.open." + w.dataset.fold, b = w.querySelector(".ed-label");
+  const set = open => { w.classList.toggle("closed", !open); b.setAttribute("aria-expanded", open); store(k, open ? "1" : "0"); };
+  set((store(k) ?? (w.dataset.fold === "setup" ? "1" : "0")) === "1");
+  b.onclick = () => { set(w.classList.contains("closed")); if (!w.classList.contains("closed")) w.querySelector("textarea").focus(); };
+}
+{
+  const ta = $("#notes"), sub = () => $("#notes-sub").textContent = ta.value.trim() ? "added" : "the problem, optional";
+  ta.value = store("sqlstepper.notes") ?? "";
+  ta.addEventListener("input", () => { store("sqlstepper.notes", ta.value); sub(); });
+  sub();
+}
 for (const [id, def] of [["setup", DEFAULT_SETUP], ["code", DEFAULT_CODE]]) {
   const ta = $("#" + id), pre = ta.previousElementSibling;
   const paint = () => { pre.innerHTML = highlight(ta.value) + "\n"; pre.scrollTop = ta.scrollTop; };
@@ -1327,7 +1356,7 @@ function md(t) {
 
 // what's on screen, in words, for the AI
 function onScreen() {
-  const c = { setup: $("#setup").value, code: $("#code").value };
+  const c = { setup: $("#setup").value, code: $("#code").value, instructions: $("#notes").value };
   if (!MAIN.length) return c;
   const s = MAIN[cur], f = F[sub];
   const tables = (s.tables || []).map(t => `Table ${t.name || ""} (${t.cols.join(", ")}):\n` +
