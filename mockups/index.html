@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stepper Mockups</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="common.css">
+<style>
+html, body { height: 100%; }
+body { display: flex; flex-direction: column; }
+header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--panel); }
+h1 { font-size: 15px; font-weight: 650; margin: 0; }
+.seg { display: flex; gap: 3px; padding: 3px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line); }
+.seg button { border: 0; background: none; padding: 5px 11px; border-radius: 7px; cursor: pointer; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+.seg button.on { background: var(--panel); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+.seg-label { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.spacer { flex: 1; }
+.tabs[hidden] { display: none; }
+.tabs { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--bg); }
+.tab { text-align: left; padding: 9px 12px; border-radius: 11px; border: 1px solid var(--line); background: var(--panel); cursor: pointer; min-width: 0; transition: border-color .12s, box-shadow .12s; }
+.tab:hover:not(:disabled) { border-color: var(--faint); }
+.tab:disabled { cursor: default; opacity: .55; }
+.tab.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
+.tab .row { display: flex; align-items: center; gap: 8px; }
+.tab .num { font: 600 12px var(--mono); color: var(--accent); }
+.tab .name { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tab .by { margin-left: auto; font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 2px 6px; border-radius: 5px; background: var(--panel-2); color: var(--muted); flex: none; }
+.tab .by.codex { color: var(--green); background: var(--green-bg); }
+.tab .by.claude { color: var(--accent); background: var(--accent-bg); }
+.tab .desc { font-size: 11.5px; color: var(--muted); margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+iframe { flex: 1; width: 100%; border: 0; background: var(--bg); display: block; }
+.hint { font-size: 12px; color: var(--muted); }
+@media (max-width: 1100px) { .tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+</style>
+</head>
+<body>
+<header>
+  <h1>SQL Stepper · Annotated Code mockup</h1>
+  <span class="seg-label">Example</span>
+  <div class="seg" id="scen"></div>
+  <div class="spacer"></div>
+  <span class="hint" id="hint">← → parts · ↑ ↓ rows inside a part · Space plays</span>
+</header>
+<div class="tabs" id="tabs"></div>
+<iframe id="frame" title="Mockup"></iframe>
+
+<script src="data.js"></script>
+<script>
+// ponytail: only #3 is under review now; the other five files stay in this folder. Add numbers here to show them again.
+const SHOWN = [3];
+const MOCKS = [1, 2, 3, 4, 5, 6].map(n => ({ n, file: `m${n}.html`, by: n <= 3 ? "Claude" : "Codex", ok: false, name: "", desc: "" }));
+const st = Object.fromEntries(new URLSearchParams(location.hash.slice(1)));
+let mock = SHOWN.includes(+st.m) ? +st.m : SHOWN[0], scen = +st.s || 0;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+async function loadMeta() {
+  await Promise.all(MOCKS.map(async m => {
+    try {
+      const r = await fetch(m.file, { cache: "no-store" });
+      if (!r.ok) throw 0;
+      const doc = new DOMParser().parseFromString(await r.text(), "text/html");
+      Object.assign(m, { ok: true, name: doc.title, desc: doc.querySelector('meta[name="description"]')?.content || "" });
+    } catch { Object.assign(m, { ok: false, name: "Not ready yet", desc: `${m.by} is still building this one. Reload the page later.` }); }
+  }));
+}
+
+function render() {
+  document.querySelector("#scen").innerHTML = SCENARIOS.map((s, i) =>
+    `<button class="${i === scen ? "on" : ""}" data-s="${i}" title="${esc(s.name)}">${esc(s.name.replace(/\s*\(.*\)/, ""))}</button>`).join("");
+  document.querySelector("#tabs").hidden = SHOWN.length < 2;
+  document.querySelector("#tabs").innerHTML = MOCKS.filter(m => SHOWN.includes(m.n)).map(m => `<button class="tab ${m.n === mock ? "on" : ""}" data-m="${m.n}" ${m.ok ? "" : "disabled"}>
+    <div class="row"><span class="num">${m.n}</span><span class="name">${esc(m.name)}</span><span class="by ${m.by.toLowerCase()}">${m.by}</span></div>
+    <div class="desc">${esc(m.desc)}</div></button>`).join("");
+  const src = `${MOCKS[mock - 1].file}?s=${scen}`;
+  const f = document.querySelector("#frame");
+  if (!f.src.endsWith(src)) f.src = src;
+  history.replaceState(null, "", `#m=${mock}&s=${scen}`);
+}
+
+document.querySelector("#scen").onclick = e => { const b = e.target.closest("button"); if (b) { scen = +b.dataset.s; render(); } };
+document.querySelector("#tabs").onclick = e => { const b = e.target.closest(".tab"); if (b && !b.disabled) { mock = +b.dataset.m; render(); } };
+document.querySelector("#frame").onload = e => e.target.contentWindow.focus();  // arrows go straight to the mockup
+function onKey(e) {
+  const n = +e.key;
+  if (SHOWN.includes(n) && MOCKS[n - 1].ok && !e.target.closest?.("textarea, input")) { mock = n; render(); }
+}
+document.addEventListener("keydown", onKey);
+document.querySelector("#frame").addEventListener("load", e => e.target.contentDocument.addEventListener("keydown", onKey));
+
+loadMeta().then(() => {
+  if (!MOCKS[mock - 1].ok) mock = MOCKS.find(m => m.ok && SHOWN.includes(m.n))?.n || SHOWN[0];
+  render();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,1164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SQL Stepper</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0d0f14; --panel: #13161d; --panel-2: #191d26; --line: #242a36; --line-2: #2f3746;
+  --text: #e7eaf0; --muted: #8a93a6; --faint: #5b6476;
+  --accent: #8b9dff; --accent-bg: rgba(139,157,255,.13);
+  --green: #4ade80; --green-bg: rgba(74,222,128,.12);
+  --red: #f87171; --red-bg: rgba(248,113,113,.11);
+  --amber: #fbbf24; --amber-bg: rgba(251,191,36,.14);
+  --blue: #60a5fa; --blue-bg: rgba(96,165,250,.15);
+  --kw: #c4a7ff; --str: #86efac; --num: #fdba74; --fn: #7dd3fc; --cmt: #5b6476;
+  --shadow: 0 8px 24px rgba(0,0,0,.25);
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --sans: "Inter", system-ui, sans-serif;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f6f7f9; --panel: #fff; --panel-2: #f3f4f7; --line: #e4e7ec; --line-2: #d5dae2;
+    --text: #151922; --muted: #5d6677; --faint: #98a1b1;
+    --accent: #4f5fe8; --accent-bg: rgba(79,95,232,.09);
+    --green: #15803d; --green-bg: rgba(34,197,94,.14);
+    --red: #dc2626; --red-bg: rgba(239,68,68,.10);
+    --amber: #b45309; --amber-bg: rgba(245,158,11,.16);
+    --blue: #2563eb; --blue-bg: rgba(59,130,246,.12);
+    --kw: #7c3aed; --str: #15803d; --num: #c2410c; --fn: #0369a1; --cmt: #98a1b1;
+    --shadow: 0 1px 2px rgba(16,24,40,.05), 0 6px 18px rgba(16,24,40,.05);
+    color-scheme: light;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 14px/1.55 var(--sans); -webkit-font-smoothing: antialiased; }
+/* JetBrains Mono merges >= into one symbol; keep the real characters (the `font` shorthand elsewhere would reset this) */
+* { font-variant-ligatures: none !important; font-feature-settings: "calt" 0, "liga" 0 !important; }
+button { font: inherit; color: inherit; }
+.k { color: var(--kw); font-weight: 500; } .s { color: var(--str); } .n { color: var(--num); } .f { color: var(--fn); } .c { color: var(--cmt); font-style: italic; }
+mark.hl { background: var(--accent-bg); color: inherit; border-radius: 4px; box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--accent) 55%, transparent); }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 34px; min-width: 34px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--line-2); background: var(--panel); cursor: pointer; font-weight: 500; }
+.btn:hover:not(:disabled) { border-color: var(--faint); }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn.primary { background: var(--accent); color: #fff; border-color: transparent; }
+.btn:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* tables */
+.tbl { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); overflow: hidden; box-shadow: var(--shadow); }
+.tbl-head { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+.tbl-head b { font: 600 13px var(--mono); color: var(--text); }
+.tbl-head .right { margin-left: auto; }
+.tbl-scroll { overflow: auto; max-height: 56vh; }
+table { border-collapse: separate; border-spacing: 0; width: 100%; font: 13px/1.4 var(--mono); }
+th { position: sticky; top: 0; background: var(--panel-2); text-align: left; font-weight: 600; font-size: 12px; color: var(--muted); padding: 7px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: 7px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; transition: background .2s, opacity .2s; }
+tr:last-child td { border-bottom: 0; }
+.null { color: var(--faint); font-style: italic; }
+td.rn, th.rn { width: 1%; color: var(--faint); padding-right: 4px; text-align: right; }
+tr.m-added td { background: var(--green-bg); } tr.m-added td.rn { box-shadow: inset 3px 0 var(--green); }
+tr.m-removed td, tr.m-out td { background: var(--red-bg); color: var(--red); text-decoration: line-through; }
+tr.m-removed td.rn, tr.m-out td.rn { box-shadow: inset 3px 0 var(--red); }
+tr.m-dropped td { opacity: .35; text-decoration: line-through; }
+tr.m-changed td.rn { box-shadow: inset 3px 0 var(--amber); }
+tr.m-match td, tr.m-current td { background: var(--blue-bg); }
+tr.m-match td.rn, tr.m-current td.rn { box-shadow: inset 3px 0 var(--blue); }
+td.ch { background: var(--amber-bg) !important; }
+td.ch s { color: var(--muted); margin-right: 6px; }
+tr.g td.rn { box-shadow: inset 3px 0 var(--gc); }
+tr.g.alt td { background: color-mix(in srgb, var(--gc) 8%, transparent); }
+tr.gstart td { border-top: 1px solid var(--line-2); }
+.empty-t { padding: 18px; text-align: center; color: var(--muted); font-size: 13px; }
+.fade { animation: fade .2s ease-out; }
+@keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .fade { animation: none; } td { transition: none; } }
+
+.doc { max-width: 1080px; margin: 0 auto; display: grid; gap: 18px; align-content: start; }
+
+/* numbered badges */
+.badge { display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 6px; border-radius: 99px; font: 700 11.5px var(--mono); border: 1.5px solid var(--line-2); color: var(--muted); background: var(--panel); cursor: pointer; transition: transform .12s, background .12s; }
+.badge:hover { transform: scale(1.1); }
+.badge.done { border-color: color-mix(in srgb, var(--accent) 55%, transparent); color: var(--accent); }
+.badge.on { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 0 0 4px var(--accent-bg); }
+.badge[data-kind=change] { border-style: dashed; }
+.badge[data-kind=error] { border-color: var(--red); color: var(--red); }
+.badge.on[data-kind=error] { background: var(--red); color: #fff; box-shadow: 0 0 0 4px var(--red-bg); }
+.panel[data-kind=error] { border-left-color: var(--red); background: var(--red-bg); }
+.panel[data-kind=error] .p-title { color: var(--red); }
+
+/* code */
+.card { border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); overflow: hidden; }
+.card-head { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 600; color: var(--muted); }
+.lines { padding: 10px 0; }
+.line { display: grid; grid-template-columns: 96px 1fr; align-items: start; min-height: 30px; }
+.gut { display: flex; gap: 4px; justify-content: flex-end; padding: 3px 14px 0 8px; flex-wrap: wrap; }
+.src { font: 14.5px/30px var(--mono); white-space: pre-wrap; word-break: break-word; padding-right: 16px; }
+.line.dim .src { opacity: .4; }
+mark.hl { box-shadow: none; border-radius: 2px; background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.mono { font-family: var(--mono); }
+u.focus { text-decoration: none; background: color-mix(in srgb, var(--amber) 22%, transparent); box-shadow: inset 0 -2px var(--amber); border-radius: 3px; }
+
+/* the inline panel under the running line */
+.panel { margin: 8px 16px 14px 96px; padding: 16px 18px 18px; border-left: 3px solid var(--accent); border-radius: 0 14px 14px 0; background: var(--panel-2); display: grid; gap: 14px; align-content: start; }
+.start-card .panel { margin-left: 16px; }
+.p-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.p-title { font: 700 14px var(--mono); color: var(--accent); }
+.p-scope { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 99px; background: var(--panel); border: 1px solid var(--line); color: var(--muted); }
+.p-flow { margin-left: auto; font: 600 12px var(--mono); color: var(--muted); }
+.p-flow b { color: var(--text); }
+.p-explain { margin: 0; font-size: 15px; line-height: 1.6; max-width: 80ch; }
+.gkey { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; font: 13px var(--mono); color: var(--text); }
+.gkey b { color: var(--muted); font-weight: 600; margin-right: 2px; }
+.gkey em { font-style: normal; color: var(--muted); margin-left: 6px; }
+.gkey em::before { content: "= "; color: var(--faint); }
+.gkey i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 7px; vertical-align: -1px; }
+
+/* sub-stepper */
+.sub { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); }
+.sub .btn { height: 30px; min-width: 30px; padding: 0 9px; }
+.sub .label { font-weight: 600; font-size: 13px; min-width: 150px; }
+.sub .label small { font-weight: 400; color: var(--muted); margin-left: 6px; }
+.sub .dots { display: flex; gap: 4px; flex-wrap: wrap; margin-left: auto; max-width: 50%; }
+.sub .dots button { width: 9px; height: 9px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; background: var(--line-2); }
+.sub .dots button.done { background: color-mix(in srgb, var(--accent) 50%, var(--line-2)); }
+.sub .dots button.on { background: var(--accent); transform: scale(1.35); }
+.sub .dots button.end { border-radius: 3px; }
+
+/* focus card: the one thing happening right now */
+.focus-card { padding: 14px 16px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line-2); display: grid; gap: 8px; }
+.chk { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font: 14px var(--mono); }
+.chk .expr { color: var(--muted); min-width: 0; }
+.val { display: inline-block; padding: 1px 8px; border-radius: 6px; background: var(--panel-2); border: 1px solid var(--line-2); font-weight: 600; }
+.arrow-r { color: var(--faint); }
+.t-yes { color: var(--green); font-weight: 700; } .t-no { color: var(--red); font-weight: 700; } .t-null { color: var(--amber); font-weight: 700; }
+.verdict { font: 600 14px var(--sans); padding-top: 4px; border-top: 1px dashed var(--line-2); }
+.verdict:first-child { border-top: 0; padding-top: 0; }
+.verdict.yes { color: var(--green); } .verdict.no { color: var(--red); }
+.whens { display: grid; grid-template-columns: auto auto 1fr auto; gap: 6px 14px; align-items: center; font: 14px var(--mono); }
+.when { display: contents; }
+.when .wm { font-weight: 700; color: var(--red); text-align: center; }
+.when.win .wm, .when.win .mono { color: var(--green); font-weight: 700; }
+.when.skip > * { color: var(--faint); }
+
+/* tables */
+.tables { display: grid; gap: 12px; }
+.tbl-scroll { max-height: 46vh; }
+th.hl, td.hl { background: var(--accent-bg) !important; }
+th.hl { color: var(--accent); }
+/* thin, see-through outlines: they trace the data without covering it */
+@property --ol { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --rl { syntax: "<color>"; inherits: true; initial-value: transparent; }
+td.hl-in, th.hl-in { animation: ol-in .5s ease both; } td.hl-out, th.hl-out { animation: ol-out .5s ease both; }
+tr.hl-in { animation: rl-in .5s ease both; } tr.hl-out { animation: rl-out .5s ease both; }
+@keyframes ol-in { from { --ol: transparent; } } @keyframes ol-out { to { --ol: transparent; } }
+@keyframes rl-in { from { --rl: transparent; } } @keyframes rl-out { to { --rl: transparent; } }
+:root { --ol: color-mix(in srgb, var(--accent) 65%, var(--panel)); --rl: color-mix(in srgb, var(--blue) 65%, var(--panel)); }
+th.sel { color: var(--accent); }
+th.sel, td.sel, th.selw, td.selw { position: relative; }
+th.sel::before, td.sel::before, th.selw::before, td.selw::before { content: ""; position: absolute; z-index: 2; top: 0; bottom: -1px; left: 6px; width: calc(var(--w) + 16px); border: 0 solid var(--ol); border-width: 0 2.5px; pointer-events: none; }
+th.sel::before, th.selw::before { border-top-width: 2.5px; border-radius: 7px 7px 0 0; }
+tr:last-child td.sel::before, tr:last-child td.selw::before { bottom: 0; border-bottom-width: 2.5px; border-radius: 0 0 7px 7px; }
+td.empty { color: var(--faint); }
+/* the value being compared right now: an amber pill, matching the amber underline in the code */
+.hot { display: inline-block; margin: -2px -7px; padding: 2px 7px; border-radius: 6px; font-weight: 700; color: var(--text);
+  background: var(--amber-bg); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--amber) 70%, transparent); animation: hot-in .5s ease both; }
+@keyframes hot-in { from { background: transparent; box-shadow: inset 0 0 0 1.5px transparent; } }
+td.chkcell { width: 1%; text-align: center; font-weight: 700; }
+td.chkcell.yes { color: var(--green); } td.chkcell.no { color: var(--red); }
+/* the row being looked at gets an outline; every other row stays readable */
+/* the table has rounded corners (12px); the last row's corner cells match, so row outlines follow the curve */
+tbody tr:last-child td:first-child { border-bottom-left-radius: 11px; }
+tbody tr:last-child td:last-child { border-bottom-right-radius: 11px; }
+tr.m-dropped td { opacity: 1; color: var(--red); }
+/* the size is left un-important so the sweep animation can grow it */
+tr.m-strike td { color: var(--red) !important; background-color: transparent !important; background-image: linear-gradient(var(--red), var(--red)) !important; background-position: left center !important; background-repeat: no-repeat !important; background-size: 0% 2px; }
+tr.m-current td { background: transparent; box-shadow: inset 0 1.5px var(--rl), inset 0 -1.5px var(--rl); }
+tr.m-was td { box-shadow: inset 0 1.5px var(--rl), inset 0 -1.5px var(--rl); }
+tr.m-current td.rn { box-shadow: inset 1.5px 0 var(--rl), inset 0 1.5px var(--rl), inset 0 -1.5px var(--rl); }
+tr.m-was td.rn { box-shadow: inset 1.5px 0 var(--rl), inset 0 1.5px var(--rl), inset 0 -1.5px var(--rl); }
+tr.m-current td:last-child { box-shadow: inset -1.5px 0 var(--rl), inset 0 1.5px var(--rl), inset 0 -1.5px var(--rl); }
+tr.m-was td:last-child { box-shadow: inset -1.5px 0 var(--rl), inset 0 1.5px var(--rl), inset 0 -1.5px var(--rl); }
+/* the current group gets one outline around all of its rows */
+tr.g.m-grp td { --t: 0 0 transparent; --b: 0 0 transparent; box-shadow: inset 0 var(--t), inset 0 var(--b); }
+tr:not(.m-grp) + tr.m-grp td, tr.m-grp:first-child td { --t: 1.5px var(--rl); }
+tr.m-grp:has(+ tr:not(.m-grp)) td, tr.m-grp:last-child td { --b: -1.5px var(--rl); }
+tr.g.m-grp td.rn { box-shadow: inset 1.5px 0 var(--rl), inset 0 var(--t), inset 0 var(--b); }
+tr.g.m-grp td:last-child { box-shadow: inset -1.5px 0 var(--rl), inset 0 var(--t), inset 0 var(--b); }
+tr.g.m-gw td { --t: 0 0 transparent; --b: 0 0 transparent; box-shadow: inset 0 var(--t), inset 0 var(--b); }
+tr:not(.m-gw) + tr.m-gw td, tr.m-gw:first-child td { --t: 1.5px var(--rl); }
+tr.m-gw:has(+ tr:not(.m-gw)) td, tr.m-gw:last-child td { --b: -1.5px var(--rl); }
+tr.g.m-gw td.rn { box-shadow: inset 1.5px 0 var(--rl), inset 0 var(--t), inset 0 var(--b); }
+tr.g.m-gw td:last-child { box-shadow: inset -1.5px 0 var(--rl), inset 0 var(--t), inset 0 var(--b); }
+tr.m-new td { background: var(--green-bg); animation: pop 1.2s ease-out; }
+/* JOIN: the two inputs side by side, smaller */
+.pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; align-items: start; }
+.pair table { font-size: 11.5px; }
+.pair th { font-size: 11px; padding: 5px 10px; }
+.pair td { padding: 5px 10px; }
+.pair .tbl-scroll { max-height: 34vh; }
+/* a value flying from an input row into the combined row */
+.fly { position: fixed; z-index: 20; pointer-events: none; display: flex; align-items: center; padding: 0 10px; border-radius: 6px;
+  font: 600 12px/1 var(--mono); color: var(--text); background: color-mix(in srgb, var(--accent) 22%, var(--panel)); box-shadow: 0 4px 14px rgba(0,0,0,.25); white-space: nowrap; overflow: hidden; }
+.fly .hot { margin: 0; padding: 0; background: none; box-shadow: none; }
+tr.m-new td.rn { box-shadow: inset 3px 0 var(--green); }
+@keyframes pop { from { background: color-mix(in srgb, var(--green) 35%, transparent); } }
+.was { color: var(--muted); font-size: 11.5px; }
+.was.up { color: var(--green); } .was.down { color: var(--amber); }
+
+/* dock */
+.dock { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.dock .btn { width: 108px; flex: none; }
+.dock[hidden] { display: none; }
+.dock .label { font-size: 13px; min-width: 240px; max-width: 440px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dock .label b { font-family: var(--mono); }
+@media (max-width: 800px) { .line { grid-template-columns: 64px 1fr; } .panel { margin-left: 12px; } .sub .dots { display: none; } }
+::view-transition-group(*) { animation-duration: .8s; animation-delay: var(--vt-wait, 0s); animation-timing-function: cubic-bezier(.45, 0, .25, 1); }
+/* No fading and no overlap: what leaves shrinks away first, then what stays glides to its new spot
+   (already showing its new content), then what is new grows in. Timings are set per step in step(). */
+::view-transition-old(*) { display: none; }
+::view-transition-new(*) { animation: none; }
+::view-transition-old(*):only-child { display: block; animation: vt-shrink .6s cubic-bezier(.45, 0, .25, 1) both; }
+::view-transition-new(*):only-child { animation: vt-grow .6s var(--vt-grow, 0s) cubic-bezier(.45, 0, .25, 1) both; }
+@keyframes vt-shrink { to { transform: scale(0); } } @keyframes vt-grow { from { transform: scale(0); } }
+@media (prefers-reduced-motion: reduce) { tr.m-new td { animation: none; } }
+
+/* ---------- app layout: editors on the left, the stepper on the right; the page itself scrolls ---------- */
+/* brand | part controls (centered) | Run */
+header { position: sticky; top: 0; z-index: 10; height: 52px; display: grid; grid-template-columns: minmax(max-content, 1fr) minmax(0, auto) minmax(max-content, 1fr); align-items: center; gap: 12px; padding: 0 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.brand { white-space: nowrap; display: flex; align-items: center; gap: 10px; font-weight: 650; letter-spacing: -.01em; }
+.logo { width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; background: linear-gradient(135deg, var(--accent), #c084fc); color: #fff; }
+.brand small { margin-left: 8px; font-weight: 500; color: var(--muted); }
+#run { grid-column: 3; justify-self: end; }
+.spin { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+main { display: grid; grid-template-columns: minmax(300px, 30%) 1fr; align-items: start; }
+.side { position: sticky; top: 52px; height: calc(100vh - 52px); display: grid; grid-template-rows: minmax(120px, 40%) 1fr; gap: 12px; padding: 14px 16px 16px; border-right: 1px solid var(--line); }
+.view { min-width: 0; padding: 20px 24px 40px; }
+.panel { scroll-margin: 70px 0 24px; }
+#doc { overflow-anchor: none; }
+
+/* ---------- editors ---------- */
+.ed-wrap { display: flex; flex-direction: column; min-height: 0; }
+.ed-label { font-size: 12px; font-weight: 600; margin-bottom: 6px; display: flex; justify-content: space-between; }
+.ed-label span { color: var(--muted); font-weight: 400; }
+.editor { position: relative; flex: 1; min-height: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); overflow: hidden; transition: border-color .15s; }
+.editor:focus-within { border-color: var(--accent); }
+.editor pre, .editor textarea { position: absolute; inset: 0; margin: 0; padding: 12px 14px; font: 13px/1.6 var(--mono); white-space: pre-wrap; word-wrap: break-word; overflow: auto; tab-size: 2; }
+.editor pre { pointer-events: none; color: var(--text); }
+.editor textarea { resize: none; border: 0; outline: none; background: transparent; color: transparent; caret-color: var(--text); }
+.editor textarea::selection { background: var(--accent-bg); color: transparent; }
+.editor textarea::placeholder { color: var(--faint); }
+textarea:focus-visible { outline: none; }
+
+.doc-empty { min-height: 60vh; display: grid; place-items: center; text-align: center; color: var(--muted); padding: 24px; }
+.doc-empty .big { font-size: 16px; color: var(--text); font-weight: 600; margin: 12px 0 4px; }
+.error-box { max-width: 760px; margin: 40px auto; padding: 16px 18px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--red) 45%, transparent); background: var(--red-bg); }
+/* keep the header and the bottom bar above anything that is animating */
+/* the header stays on top and tracks its real spot every frame instead of gliding */
+::view-transition-group(vt-header) { z-index: 1; animation: none; }
+/* part change on a nearby line: snapshots don't animate their own position, they track the real
+   elements every frame, which ride on the sliding panel box (see go()) */
+:root.vt-ride::view-transition-group(*) { animation: none; }
+@media (max-width: 1000px) {
+  main { grid-template-columns: 1fr; }
+  .side { position: static; height: 560px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .view { padding: 16px 12px; }
+  .dock .label { min-width: 0; flex: 1; }
+  .brand small { display: none; }
+}
+@media (max-width: 640px) {
+  .brand-name, .dock .label { display: none; }
+  .view { min-width: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4l10 8-10 8"/><path d="M19 5v14"/></svg></div>
+    <span class="brand-name">SQL Stepper <small>MySQL 8.0</small></span>
+  </div>
+  <div class="dock" hidden>
+    <button class="btn" id="prev" aria-label="Previous part">‹ Back</button>
+    <div class="label" id="label"></div>
+    <button class="btn primary" id="next" aria-label="Next part">Next part ›</button>
+  </div>
+  <button class="btn primary" id="run" title="Run (Ctrl+Enter)"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l14 8-14 8z"/></svg><span>Run</span></button>
+</header>
+<main>
+  <section class="side">
+    <div class="ed-wrap">
+      <div class="ed-label">Schema <span>starting tables and data</span></div>
+      <div class="editor"><pre aria-hidden="true"></pre><textarea id="setup" spellcheck="false" aria-label="Schema SQL" placeholder="CREATE TABLE ... / INSERT INTO ..."></textarea></div>
+    </div>
+    <div class="ed-wrap">
+      <div class="ed-label">Your code <span>what to step through</span></div>
+      <div class="editor"><pre aria-hidden="true"></pre><textarea id="code" spellcheck="false" aria-label="Your SQL" placeholder="SELECT ... / UPDATE ... / DELETE ..."></textarea></div>
+    </div>
+  </section>
+  <section class="view">
+    <div class="doc" id="doc"><div class="doc-empty"><div><div class="big">Paste some SQL and press Run</div><div>You'll step through it in the order MySQL actually runs it.</div></div></div></div>
+  </section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const GC = ["#8b9dff", "#f472b6", "#34d399", "#fbbf24", "#60a5fa", "#fb7185", "#a78bfa", "#2dd4bf"];
+const cellHtml = v => v === null ? `<span class="null">NULL</span>` : esc(v);
+const liveRows = t => t ? t.rows.filter(r => !["dropped", "removed"].includes(r.m)).length + t.more : 0;
+const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+
+// ---------- SQL syntax highlighting ----------
+const KW = new Set(("select from where group by having order limit offset join inner left right outer cross full on using as and or not " +
+  "in is null like between case when then else end distinct union all intersect except with recursive insert into values update set " +
+  "delete create table if exists drop alter add column primary key foreign references truncate asc desc over partition rows range " +
+  "unbounded preceding following current row int integer varchar char text date datetime decimal float double bigint boolean default " +
+  "unique index view replace ignore true false interval enum auto_increment constraint check").split(" "));
+function highlight(src) {
+  const re = /(--[^\n]*|#[^\n]*|\/\*[\s\S]*?\*\/)|('(?:[^'\\]|\\.|'')*'?|"(?:[^"\\]|\\.)*"?|`[^`]*`?)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_][A-Za-z0-9_]*)(?=\s*\()|([A-Za-z_][A-Za-z0-9_]*)/g;
+  let out = "", last = 0, m;
+  while ((m = re.exec(src))) {
+    out += esc(src.slice(last, m.index));
+    const t = esc(m[0]);
+    if (m[1]) out += `<span class="c">${t}</span>`;
+    else if (m[2]) out += `<span class="s">${t}</span>`;
+    else if (m[3]) out += `<span class="n">${t}</span>`;
+    else if (m[4]) out += KW.has(m[4].toLowerCase()) ? `<span class="k">${t}</span>` : `<span class="f">${t}</span>`;
+    else out += KW.has(m[5].toLowerCase()) ? `<span class="k">${t}</span>` : t;
+    last = re.lastIndex;
+  }
+  return out + esc(src.slice(last));
+}
+
+// Find the step's clause inside the original statement, tolerating spacing, case and an added "AS".
+// Main-query steps prefer a match outside parentheses; nested steps prefer one inside.
+function locate(text, title, nested) {
+  const toks = title.match(/[A-Za-z0-9_$.]+|'[^']*'|`[^`]*`|[^\sA-Za-z0-9_]/g);
+  if (!toks || toks.length > 40) return null;
+  const pat = toks.map(t => /^as$/i.test(t) ? "(?:AS\\s+)?" : t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/^`(.*)`$/, "`?$1`?"))
+    .join("\\s*");
+  let re;
+  try { re = new RegExp(pat, "gi"); } catch { return null; }
+  const found = [...text.matchAll(re)].map(m => [m.index, m.index + m[0].length]);
+  const depthAt = i => { let d = 0; for (const c of text.slice(0, i)) d += c === "(" ? 1 : c === ")" ? -1 : 0; return d; };
+  return found.find(([a]) => (depthAt(a) > 0) === nested) || found[0] || null;
+}
+
+// ---------- editors ----------
+const DEFAULT_SETUP = `Create table If Not Exists Tree (id int, p_id int)
+Truncate table Tree
+insert into Tree (id, p_id) values ('1', NULL)
+insert into Tree (id, p_id) values ('2', '1')
+insert into Tree (id, p_id) values ('3', '1')
+insert into Tree (id, p_id) values ('4', '2')
+insert into Tree (id, p_id) values ('5', '2')`;
+const DEFAULT_CODE = `SELECT id,
+  CASE
+    WHEN p_id IS NULL THEN 'Root'
+    WHEN id IN (SELECT p_id FROM Tree) THEN 'Inner'
+    ELSE 'Leaf'
+  END AS type
+FROM Tree
+ORDER BY id;`;
+function store(k, v) { try { v === undefined ? (v = localStorage.getItem(k)) : localStorage.setItem(k, v); } catch { v = null; } return v; }
+for (const [id, def] of [["setup", DEFAULT_SETUP], ["code", DEFAULT_CODE]]) {
+  const ta = $("#" + id), pre = ta.previousElementSibling;
+  const paint = () => { pre.innerHTML = highlight(ta.value) + "\n"; pre.scrollTop = ta.scrollTop; };
+  ta.value = store("sqlstepper." + id) ?? def;
+  ta.addEventListener("input", () => { paint(); store("sqlstepper." + id, ta.value); });
+  ta.addEventListener("scroll", () => { pre.scrollTop = ta.scrollTop; });
+  ta.addEventListener("keydown", e => {
+    if (e.key === "Tab" && !e.shiftKey && !e.ctrlKey) { e.preventDefault(); document.execCommand("insertText", false, "  "); }
+  });
+  paint();
+}
+
+// ---------- helpers ----------
+const STOP = /^(FROM|WHERE|GROUP\s+BY|HAVING|ORDER\s+BY|LIMIT|UNION|SET|(?:LEFT|RIGHT|INNER|CROSS)\s+JOIN|JOIN)\b/i;
+function clauseEnd(text, start) {  // a clause runs to the next top-level clause keyword or its closing paren
+  const own = STOP.exec(text.slice(start)) || /^\w+/.exec(text.slice(start));
+  let d = 0;
+  for (let i = start + (own ? own[0].length : 1); i < text.length; i++) {
+    const c = text[i];
+    if (c === "(") d++;
+    else if (c === ")") { if (--d < 0) return i; }
+    else if (!d && /\s/.test(text[i - 1]) && STOP.test(text.slice(i))) return text.slice(0, i).trimEnd().length;
+  }
+  return text.replace(/[;\s]+$/, "").length;
+}
+const lineOf = (text, i) => text.slice(0, i).split("\n").length - 1;
+const v = x => x === null || x === undefined ? `<span class="val null">NULL</span>` : `<span class="val">${esc(x)}</span>`;
+const truth = t => t === null || t === undefined ? `<span class="t-null">NULL ✗</span>`
+  : +t ? `<span class="t-yes">true ✓</span>` : `<span class="t-no">false ✗</span>`;
+const short = (r, n = 3) => r.v.slice(0, n).map(x => x === null ? "NULL" : x).join(", ");
+
+// Table: rows [{v, m, old, g}], opts: {title, right, pre(row,i) -> [cls, html], preHead, col(c) -> "hl"|"empty"|""}
+function grid(cols, rows, o = {}) {
+  // ponytail: width from JetBrains Mono metrics (0.6em per char: 13px cells, 12px headers); a fallback font would be slightly off
+  const txt = x => x === null || x === undefined ? "NULL" : String(x);
+  const w = cols.map((c, k) => o.col && /sel/.test(o.col(k, -1)) ? Math.max(c.length * 7.2, ...rows.map(r => txt(r.v[k]).length * 7.8)) : 0);
+  const ws = k => w[k] ? ` style="--w:${w[k]}px"` : "";
+  const body = rows.map((r, i) => {
+    const cls = [r.m ? "m-" + r.m : ""];
+    let style = "";
+    if (r.g !== undefined) {
+      cls.push("g", r.g % 2 ? "" : "alt");
+      if (i && rows[i - 1].g !== r.g) cls.push("gstart");
+      style = ` style="--gc:${GC[(r.g - 1) % GC.length]}"`;
+    }
+    const pre = o.pre ? o.pre(r, i) : null;
+    const cells = r.v.map((x, c) => {
+      const mode = o.col ? o.col(c, i) : "";
+      if (/empty/.test(mode)) return `<td class="${mode}"${ws(c)}>…</td>`;
+      if (o.hot && o.hot(i, c)) return `<td class="${mode}"${ws(c)}><span class="hot">${cellHtml(x)}</span></td>`;
+      return r.old && c in r.old ? `<td class="ch ${mode}"><s>${cellHtml(r.old[c])}</s>${cellHtml(x)}</td>` : `<td class="${mode}"${ws(c)}>${cellHtml(x)}</td>`;
+    }).join("");
+    return `<tr class="${cls.join(" ")}"${style} data-rk="${esc(JSON.stringify(r.v))}"${r.a || ""}><td class="rn">${i + 1}</td>${pre ? `<td class="chkcell ${pre[0]}">${pre[1]}</td>` : ""}${cells}${o.post ? `<td>${o.post(r, i)}</td>` : ""}</tr>`;
+  }).join("");
+  const head = `<tr><th class="rn">#</th>${o.pre ? `<th>${o.preHead || ""}</th>` : ""}${cols.map((c, k) => `<th class="${o.col ? o.col(k, -1).replace("empty", "") : ""}"${ws(k)}>${esc(c)}</th>`).join("")}${o.post ? `<th>${o.postHead || ""}</th>` : ""}</tr>`;
+  return `<div class="tbl" data-vt="${esc(o.key || o.title || "")}">
+    <div class="tbl-head"><b>${esc(o.title || "")}</b><span class="right">${o.right ?? plural(rows.length, "row")}</span></div>
+    <div class="tbl-scroll"><table><thead>${head}</thead><tbody>${body}</tbody></table>${rows.length ? "" : `<div class="empty-t">No rows</div>`}</div></div>`;
+}
+const plain = rows => rows.map(r => ({ v: r.v, g: r.g }));
+
+// ---------- main steps (consecutive row-by-row steps become one "SET" part with inner steps) ----------
+let SC = null, MAIN = [];
+function build(data) {
+  SC = data; MAIN = [];
+  data.steps.forEach((s, i) => {
+  const last = MAIN[MAIN.length - 1];
+  if (s.kind === "row" && last && last.rows) { last.rows.push(s); return; }
+  if (s.kind === "row") {
+    const text = SC.statements[s.stmt].text, at = locate(text, "SET", false);
+    const title = at ? text.slice(at[0], clauseEnd(text, at[0])).replace(/\s+/g, " ") : "Remove the matched rows";
+    MAIN.push({ ...s, title, rows: [s], explain: at ? "Now MySQL applies SET to each matched row, one at a time. Rows that didn't match are left alone."
+      : "Now MySQL removes each matched row, one at a time.", src: i });
+    return;
+  }
+  MAIN.push({ ...s, src: i });
+  });
+}
+// The step feeding this one: the previous part of the same statement and scope that has a table.
+function feeder(k) {
+  for (let j = k - 1; j >= 0; j--) {
+    const p = MAIN[j];
+    if (p.stmt !== MAIN[k].stmt) return null;
+    if (p.scope === MAIN[k].scope && p.tables.length && p.kind !== "note") return p;
+  }
+  return null;
+}
+const keptRows = s => { const t = s.tables[0]; return t.rows.filter(r => !["dropped", "removed"].includes(r.m)); };
+
+// ---------- inner steps ("frames") for each kind of part ----------
+function frames(k) {
+  const s = MAIN[k], d = s.detail || {}, t = s.tables[0], prev = feeder(k);
+  if (s.rows) return s.rows.map(r => ({ label: r.title,  // the changed cells show old → new themselves
+    body: grid(r.tables[0].cols, r.tables[0].rows, { title: r.tables[0].name }) }));
+  if (d.type === "filter") return filterFrames(s, d, t);
+  if (d.type === "join") return joinFrames(s, d, t, prev);
+  if (d.type === "group") return groupFrames(s, d, t);
+  if (d.type === "select" && t && t.cols.length === d.cols.length) return selectFrames(s, d, t, prev);
+  if (/^ORDER BY/i.test(s.title) && prev) return orderFrames(s, t, prev);
+  if (/^(LIMIT|DISTINCT)/i.test(s.title) && prev) return cutFrames(s, t, prev);
+  return [{ label: "", card: "", body: s.tables.map(x => grid(x.cols, x.rows, { title: x.name + (x.badge ? ` · ${x.badge}` : ""), right: plural(liveRows(x), "row") })).join("") }];
+}
+
+// The actual values each check compared (same layout checkLines reads: truth, then left, then right).
+function checkVals(d, raw) {
+  let i = 0; const out = new Set();
+  d.checks.forEach(c => { i++; if ("left" in c) out.add(String(raw[i++])); if ("right" in c) out.add(String(raw[i++])); });
+  return out;
+}
+function checkLines(d, raw, aliases = {}) {
+  let i = 0;
+  return d.checks.map(c => {
+    c = aliases[c.left] ? { ...c, left: `${aliases[c.left]} = ${c.left}` } : c;  // HAVING n >= 2 is checked as COUNT(*) >= 2
+    const tv = raw[i++], l = "left" in c ? raw[i++] : undefined, r = "right" in c ? raw[i++] : undefined;
+    let line;
+    // name the right side too when it is a column or expression (a plain literal like 60000 would just repeat its value)
+    const rName = "right" in c && /^[A-Za-z_`]/.test(c.right) && !/^(null|true|false)$/i.test(c.right) ? `<span class="expr">${esc(c.right)}</span> ` : "";
+    if ("right" in c) line = `<span class="expr">${esc(c.left)}</span> ${v(l)} <b>${esc(c.op)}</b> ${rName}${v(r)}`;
+    else if (c.list) line = `<span class="expr">${esc(c.left)}</span> ${v(l)} <b>${esc(c.rest.split(/\s/)[0])}</b> <span class="expr">the subquery's list</span> [${c.list.map(v).join(" ")}]`;
+    else if ("left" in c) line = `<span class="expr">${esc(c.left)}</span> ${v(l)} <b>${esc(c.rest)}</b>`;
+    else line = `<span class="expr">${esc(c.sql)}</span>`;
+    const vals = "right" in c ? `${v(l)} ${esc(c.op)} ${v(r)}` : c.list ? `${v(l)} ${esc(c.rest.split(/\s/)[0])} [${c.list.map(v).join(" ")}]`
+      : "left" in c ? `${v(l)} ${esc(c.rest)}` : `<span class="expr">${esc(c.sql)}</span>`;
+    return { t: tv, vals, html: `<div class="chk">${line}<span class="arrow-r">→</span>${truth(tv)}</div>` };
+  });
+}
+
+function filterFrames(s, d, t) {
+  const aliases = (MAIN.find(x => x.stmt === s.stmt && x.detail?.type === "group")?.detail.aliases) || {};
+  const matchMode = t.rows.some(r => r.m === "match");
+  const kept = r => matchMode ? r.m === "match" : r.m !== "dropped";
+  const unit = d.groups ? "group" : "row", cond = d.checks.map(c => c.sql).join(` ${d.combine || ""} `);
+  // columns the condition compares (a HAVING alias like n counts as its aggregate, e.g. COUNT(*))
+  const aliased = Object.entries(aliases).filter(([, a]) => new RegExp(`\\b${a}\\b`).test(cond)).map(([e]) => e).join(" ");
+  const used = usedCols({ sql: `${cond} ${aliased}` }, t.cols);
+  const base = t.rows.map(r => ({ v: r.v, g: r.g }));
+  const n = Math.min(t.rows.length, 40);
+  const out = [{ label: `Every ${unit}`,
+    body: grid(t.cols, base, { key: "rows", title: `Every ${unit} going in`, pre: () => ["", "·"], preHead: "check" }) }];
+  for (let i = 0; i < n; i++) {
+    const r = t.rows[i], lines = checkLines(d, d.rows[i] || [], d.groups ? aliases : {}), compared = checkVals(d, d.rows[i] || []);
+    out.push({ label: `${unit[0].toUpperCase() + unit.slice(1)} ${i + 1} of ${t.rows.length}`, sub: short(r),
+      card: lines.map(l => l.html).join(""),
+      body: grid(t.cols, t.rows.map((x, j) => ({ v: x.v, g: x.g, m: j === i ? "current" : undefined })),
+        { key: "rows", title: `Checking ${unit}s`, hot: (ri, k) => ri === i && used.includes(k) && compared.has(String(t.rows[ri].v[k])), pre: (x, j) => j > i ? ["", "·"] : kept(t.rows[j]) ? ["yes", "✓"] : ["no", "✗"], preHead: "check" }) });
+  }
+  const keep = t.rows.filter(kept);
+  out.push({ label: "Result", end: true,
+    body: grid(t.cols, keep.map(r => ({ v: r.v })), { key: "rows", title: `After ${s.title.split(" ")[0]}` }) });
+  return out;
+}
+
+function joinFrames(s, d, t, prev) {
+  const L = d.left, left = prev ? keptRows(prev) : [], right = d.right || [];
+  const lCols = t.cols.slice(0, L), rCols = t.cols.slice(L);
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const used = new Set(), groups = left.map(lr => {
+    const idx = t.rows.map((r, j) => j).filter(j => !used.has(j) && same(t.rows[j].v.slice(0, L), lr.v));
+    idx.forEach(j => used.add(j));
+    return idx;
+  });
+  const onTxt = d.checks.map(c => c.sql).join(` ${d.combine || ""} `) || "every pair";
+  // columns the ON condition compares (qualified names first: in a self-join both sides share bare names)
+  const onCols = cols => { const q = cols.flatMap((c, k) => onTxt.includes(c) ? [k] : []); return q.length ? q : usedCols({ sql: onTxt }, cols); };
+  const lOn = onCols(lCols), rOn = onCols(rCols);
+  // both inputs, small and side by side; li = the current left row, ri = its matching right rows
+  const pair = (li = -1, ri = []) => `<div class="pair">${
+    grid(lCols, left.map((r, i) => ({ v: r.v, m: i === li ? "current" : undefined })), { key: "jl", title: "Left side (rows so far)", hot: (i, k) => i === li && lOn.includes(k) })}${
+    grid(rCols, right.map((v, i) => ({ v, m: ri.includes(i) ? "current" : undefined })), { key: "jr", title: `${d.table} (right side)`, hot: (i, k) => ri.includes(i) && rOn.includes(k) })}</div>`;
+  const out = [{ label: "Both sides",
+    body: pair() }];
+  const shown = new Set(), from = {};  // combined row -> [left row, right row or -1]
+  groups.slice(0, 40).forEach((idx, i) => {
+    const lr = left[i];
+    const matched = d.checks.length ? idx.filter(j => d.rows?.[j] && +d.rows[j][0]) : idx;  // no ON: every pair matches
+    const taken = new Set(), ri = [];
+    idx.forEach(j => {
+      const r = matched.includes(j) ? right.findIndex((v, k) => !taken.has(k) && same(v, t.rows[j].v.slice(L))) : -1;
+      if (r >= 0) { taken.add(r); ri.push(r); }
+      from[j] = [i, r];
+      shown.add(j);
+    });
+    let card = "";
+    if (matched.length) card += d.checks.length ? matched.map(j => checkLines(d, d.rows[j]).map(l => l.html).join("")).join("") : "";
+    else {
+      const c0 = d.checks[0], raw0 = idx.length ? d.rows[idx[0]] || [] : [];
+      if (c0 && "left" in c0 && raw0[1] === null)  // the left row's join key is NULL
+        card += `<div class="chk"><span class="expr">${esc(c0.left)}</span> ${v(null)}<span class="arrow-r">→</span><span class="t-null">NULL never matches</span></div>`;
+      card += d.side === "LEFT" ? `<div class="verdict yes">No match → kept with NULLs</div>` : `<div class="verdict no">No match → dropped</div>`;
+    }
+    const order = [...shown].sort((a, b) => a - b);
+    out.push({ label: `Left row ${i + 1} of ${left.length}`, sub: short(lr), card,
+      body: pair(i, ri) + grid(t.cols, order.map(j => ({ v: t.rows[j].v, m: idx.includes(j) ? "new" : undefined,
+        a: idx.includes(j) ? ` data-l="${from[j][0]}" data-r="${from[j][1]}" data-n="${L}"` : "" })), { key: "out", title: "Combined rows so far", right: plural(order.length, "row") }) });
+  });
+  out.push({ label: "Result", end: true,     body: grid(t.cols, t.rows.map(r => ({ v: r.v })), { key: "out", title: "After the JOIN" }) });
+  return out;
+}
+
+// JOIN merge: copies of the current left row's values and its matching right row's values fly
+// down into their columns of the combined row(s) they become; then the real row shows under them.
+async function flyMerge() {
+  const p = document.querySelector(".panel"), dst = p ? [...p.querySelectorAll('.tbl[data-vt="out"] tr[data-l]')] : [];
+  if (!dst.length) return;
+  const src = (key, i) => [...(p.querySelector(`.tbl[data-vt="${key}"] tbody`)?.children[i]?.children || [])].slice(1);
+  // first bring the source rows and the new rows into view together (the new rows win if both don't fit)
+  const top = Math.min(...dst.map(tr => +tr.dataset.l).map(i => src("jl", i)[0]?.getBoundingClientRect().top ?? Infinity)) - 60;
+  const bottom = dst.at(-1).getBoundingClientRect().bottom + 20, room = innerHeight - 52;
+  const dy = bottom > innerHeight ? bottom - innerHeight : top < 52 && bottom - top <= room ? top - 52 : 0;
+  if (Math.abs(dy) > 2) {
+    scrollBy({ top: dy, behavior: rush ? "instant" : "smooth" });
+    await new Promise(r => { addEventListener("scrollend", r, { once: true }); setTimeout(r, 900); });
+  }
+  const D = 900, opt = { duration: D, easing: "cubic-bezier(.45, 0, .25, 1)" }, jobs = [];
+  dst.forEach(tr => {
+    const cells = [...tr.children].slice(1), n = +tr.dataset.n;
+    const pairs = src("jl", +tr.dataset.l).map((td, k) => [td, cells[k]]);
+    if (+tr.dataset.r >= 0) pairs.push(...src("jr", +tr.dataset.r).map((td, k) => [td, cells[n + k]]));
+    tr.style.opacity = "";
+    jobs.push(quick(tr.animate({ opacity: [0, 0, 1] }, { duration: D + 250, fill: "backwards" })).finished);
+    pairs.forEach(([a, b]) => {
+      if (!a || !b) return;
+      const r0 = a.getBoundingClientRect(), r1 = b.getBoundingClientRect(), g = document.createElement("div");
+      g.className = "fly"; g.innerHTML = a.innerHTML;
+      Object.assign(g.style, { left: r0.left + "px", top: r0.top + "px", width: r0.width + "px", height: r0.height + "px" });
+      document.body.append(g);
+      const a1 = quick(g.animate({ transform: ["none", `translate(${r1.left - r0.left}px, ${r1.top - r0.top}px)`], width: [r0.width + "px", r1.width + "px"], height: [r0.height + "px", r1.height + "px"] }, { ...opt, fill: "forwards" }));
+      jobs.push(a1.finished.then(() => quick(g.animate({ opacity: [1, 0] }, { duration: 250, fill: "forwards" })).finished).finally(() => g.remove()));
+    });
+  });
+  return Promise.allSettled(jobs);
+}
+
+// The line under a part's title: a visual when there is one, else a few words. The animations
+// show what happens, so no paragraphs (errors keep their full message).
+function brief(s) {
+  const d = s.detail || {}, t = s.title;
+  if (s.kind === "error") return esc(s.explain);
+  if (d.type === "group") return groupKey(d);
+  const words = [
+    [/^Starting/i, "Your tables before the code runs"],
+    [/^FROM\b/i, "Start with every row"],
+    [/\bJOIN\b/i, d.side === "LEFT" ? "Pair up matching rows (unmatched left rows get NULLs)"
+      : d.side === "RIGHT" ? "Pair up matching rows (unmatched right rows get NULLs)" : "Pair up matching rows"],
+    [/^,/, "Pair every row with every row"],
+    [/^WHERE/i, /UPDATE|DELETE/.test(s.scope) ? "Find the rows where this is true" : "Keep the rows where this is true"],
+    [/^SET\b/i, "Change each matched row"],
+    [/^Remove the matched/i, "Remove each matched row"],
+    [/^HAVING/i, "Keep the groups where this is true"],
+    [/^SELECT/i, "Build the output columns"],
+    [/^DISTINCT/i, "Drop duplicate rows"],
+    [/^ORDER BY/i, "Sort the rows"],
+    [/^LIMIT/i, "Keep only the first rows"],
+  ].find(([re]) => re.test(t));
+  if (words) return words[1];
+  const first = (s.explain || "").split(/(?<=\.)\s/)[0].replace(/\s*\([^)]*\)/g, "");  // fallback: first sentence
+  return esc(first.length > 90 ? first.slice(0, 90) + "…" : first);
+}
+
+// GROUP BY: a color key (one swatch per group, labeled with its value) instead of a paragraph
+function groupKey(d) {
+  const nk = d.keys.length, rows = d.summary.rows, MAX = 16;
+  const items = rows.slice(0, MAX).map((r, g) => `<span><i style="background:${GC[g % GC.length]}"></i>Group ${g + 1}<em>${esc(r.v.slice(0, nk).map(x => x ?? "NULL").join(", "))}</em></span>`);
+  return `<div class="gkey"><b>${esc(d.keys.join(", "))}</b>${items.join("")}${rows.length > MAX ? `<span>+${rows.length - MAX} more</span>` : ""}</div>`;
+}
+
+function groupFrames(s, d, t) {
+  const sum = d.summary, G = sum.rows.length, nk = d.keys.length;
+  const sumCols = sum.cols.map(c => d.aliases && d.aliases[c] ? `${c} → ${d.aliases[c]}` : c);
+  const out = [{ label: "Sorted into groups",
+    body: grid(t.cols, t.rows, { key: "rows", title: "Rows sorted into groups (one color per group)", right: `${plural(G, "group")} · ${plural(t.rows.length, "row")}` }) }];
+  for (let g = 1; g <= G; g++) {
+    const members = t.rows.filter(r => r.g === g), key = sum.rows[g - 1].v.slice(0, nk);
+    const na = nk + (d.picked || 0);  // aggregates come after the keys and the picked columns
+    const aggs = sum.cols.slice(na).map((c, j) => `<div class="chk"><span class="expr">${esc(c)}</span><span class="arrow-r">→</span>${v(sum.rows[g - 1].v[na + j])}</div>`).join("");
+    out.push({ label: `Group ${g} of ${G}`, sub: d.keys.map((k, j) => `${k} = ${key[j] ?? "NULL"}`).join(", "),
+      card: aggs,
+      body: grid(t.cols, t.rows.map(r => ({ v: r.v, g: r.g, m: r.g === g ? "grp" : undefined })), { key: "rows", title: "Rows in each group", right: plural(G, "group") }) +
+        grid(sumCols, sum.rows.slice(0, g).map((r, j) => ({ v: r.v, m: j === g - 1 ? "new" : undefined })), { key: "out", title: "After GROUP BY", right: `${g} of ${plural(G, "row")}` }) });
+  }
+  out.push({ label: "Result", end: true,
+    body: grid(sumCols, sum.rows.map(r => ({ v: r.v })), { key: "out", title: "After GROUP BY" }) });
+  return out;
+}
+
+// input columns an expression reads (by name), so they can be outlined in the input table
+function usedCols(c, cols) {
+  if (c.star) return cols.map((x, k) => k);
+  const full = x => x.replace(/`/g, "").toLowerCase(), bare = x => full(x).split(".").pop();
+  const words = new Set((c.sql.replace(/'[^']*'/g, "").match(/[\w.`]+/g) || []).map(full));  // parent.id only matches parent.id; plain id matches any *.id
+  return cols.map((x, k) => x === c.sql || words.has(full(x)) || words.has(bare(x)) || (/\W/.test(x) && c.sql.includes(x)) ? k : -1).filter(k => k >= 0);
+}
+
+function selectFrames(s, d, t, prev) {
+  const text = SC.statements[s.stmt].text, out = [];
+  let inRows = prev ? keptRows(prev) : [], inCols = prev ? prev.tables[0].cols : [];
+  // grouped query: read from the GROUP BY table (it has every aggregate), keeping only groups that got this far
+  const grp = MAIN.find(x => x.stmt === s.stmt && x.scope === s.scope && x.detail?.type === "group")?.detail;
+  if (grp && prev) {
+    const nk = grp.keys.length, key = r => JSON.stringify(r.v.slice(0, nk)), live = new Set(inRows.map(key));
+    inCols = grp.summary.cols; inRows = grp.summary.rows.filter(r => live.has(key(r)));
+  }
+  const place = sql => { const r = locate(text, sql, !!s.scope); return r; };
+  d.cols.forEach((c, ci) => {
+    // columns after this one are still empty; this column is filled for rows up to `filled`
+    const used = usedCols(c, inCols), sameRows = inRows.length === t.rows.length;
+    const input = filled => prev ? grid(inCols, inRows.map((r, i) => ({ v: r.v, m: sameRows && i === filled && c.case ? "current" : undefined })),
+      { key: "in", title: "Input", col: k => used.includes(k) ? "sel" : "", hot: (ri, k) => c.case && sameRows && ri === filled && used.includes(k) }) : "";
+    const upto = filled => input(filled) + grid(t.cols, t.rows.map((r, i) => ({ v: r.v, m: i === filled && c.case ? "current" : undefined })), { key: "out", title: "Building the output",
+      col: (k, i) => k === ci ? (i > filled ? "empty sel" : "sel") : k > ci ? "empty" : "" });
+    out.push({ label: `Column ${ci + 1} of ${d.cols.length}`, sub: c.name, under: place(c.sql),
+      card: c.name !== c.sql && !c.star ? `<div class="chk"><span class="expr">${esc(c.name)}</span><b>=</b><span class="mono">${esc(c.sql.length > 90 ? c.sql.slice(0, 90) + "…" : c.sql)}</span></div>` : "",
+      body: upto(c.case && d.case_rows ? -1 : Infinity) });
+    if (c.case && d.case_rows) {
+        t.rows.slice(0, 40).forEach((r, ri) => {
+        const raw = d.case_rows[ri] || [];
+        const tv = c.case.branches.map(b => raw[b.offset]);
+        const win = tv.findIndex(x => +x === 1);
+        const unq = x => x.replace(/^'|'$/g, "");
+        const lines = c.case.branches.map((b, bi) => {
+          const skipped = win >= 0 && bi > win;
+          const got = skipped ? "" : checkLines(b, raw.slice(b.offset + 1));
+          const vals = skipped ? `<span class="expr">skipped</span>` : got.map(x => x.vals).join(` <b>${b.combine || ""}</b> `);
+          const mark = skipped ? "·" : +tv[bi] ? "✓" : "✗";
+          return `<div class="when ${skipped ? "skip" : bi === win ? "win" : ""}"><span class="wm">${mark}</span><span class="mono">WHEN ${esc(c.case.operand ? `${c.case.operand} = ${b.when}` : b.when)}</span><span class="wv">${vals}</span><span class="wt">${bi === win ? `→ ${v(unq(b.then))}` : ""}</span></div>`;
+        }).join("") + (c.case.else !== undefined && c.case.else !== null ? `<div class="when ${win < 0 ? "win" : "skip"}"><span class="wm">${win < 0 ? "✓" : "·"}</span><span class="mono">ELSE</span><span class="wv">${win < 0 ? `<span class="expr">nothing matched</span>` : `<span class="expr">skipped</span>`}</span><span class="wt">${win < 0 ? `→ ${v(unq(c.case.else))}` : ""}</span></div>` : "");
+        const b = win >= 0 ? c.case.branches[win] : null;
+        out.push({ label: `Row ${ri + 1} of ${t.rows.length}`, sub: `${c.name} for row ${ri + 1}`,
+          under: b ? place(`WHEN ${b.when} THEN ${b.then}`) || place(b.when) : place(`ELSE ${c.case.else}`),
+          card: `<div class="whens">${lines}</div>`,
+          body: upto(ri) });
+      });
+    }
+  });
+  out.push({ label: "Result", end: true,     body: grid(t.cols, t.rows.map(r => ({ v: r.v })), { key: "out", title: "After SELECT" }) });
+  return out;
+}
+
+function matchPositions(rows, pool) {  // where did each row of `rows` sit in `pool`?
+  const used = new Set();
+  return rows.map(r => { const j = pool.findIndex((p, k) => !used.has(k) && JSON.stringify(p.v) === JSON.stringify(r.v)); used.add(j); return j; });
+}
+function orderFrames(s, t, prev) {
+  const before = keptRows(prev), was = matchPositions(t.rows, before);
+  return [
+    { label: "Before sorting",
+      body: grid(prev.tables[0].cols, before.map(r => ({ v: r.v })), { key: "rows", title: "Going in" }) },
+    { label: "After sorting", end: true,       body: grid(t.cols, t.rows.map(r => ({ v: r.v })), { key: "rows", title: "After ORDER BY", postHead: "moved",
+        post: (r, i) => was[i] < 0 ? "" : was[i] === i ? `<span class="was">stayed</span>` : `<span class="was ${was[i] > i ? "up" : "down"}">was #${was[i] + 1} ${was[i] > i ? "↑" : "↓"}</span>` }) }];
+}
+function cutFrames(s, t, prev) {
+  const before = keptRows(prev), pos = new Set(matchPositions(t.rows, before));
+  return [
+    { label: "Before",
+      body: grid(prev.tables[0].cols, before.map((r, i) => ({ v: r.v, m: pos.has(i) ? undefined : "dropped" })), { key: "rows", title: "Going in" }) },
+    { label: "After", end: true, 
+      body: grid(t.cols, t.rows.map(r => ({ v: r.v })), { key: "rows", title: `After ${s.title.split(" ")[0]}` }) }];
+}
+
+// ---------- where each part lives in the code ----------
+function range(s) {
+  const text = SC.statements[s.stmt].text, whole = [0, text.replace(/[;\s]+$/, "").length];
+  if (s.kind === "change" || s.kind === "error") return whole;
+  const kw = s.rows ? "SET" : (/^(LEFT JOIN|RIGHT JOIN|INNER JOIN|CROSS JOIN|JOIN|GROUP BY|ORDER BY|FROM|WHERE|HAVING|SELECT|DISTINCT|LIMIT|UNION)/i.exec(s.title) || [])[1];
+  const r = (!s.rows && locate(text, s.title, !!s.scope)) || (s.sql && locate(text, s.sql, !!s.scope)) || (kw && locate(text, kw, !!s.scope));
+  return r ? [r[0], Math.max(r[1], clauseEnd(text, r[0]))] : whole;
+}
+
+// ---------- rendering ----------
+let cur = 0, sub = 0, enter = true, timer = null, F = [];
+const badge = i => `<button class="badge ${i === cur ? "on" : i < cur ? "done" : ""}" data-i="${i}" data-kind="${MAIN[i].kind}" title="${esc(MAIN[i].title)}">${i + 1}</button>`;
+
+function flow(k) {
+  const s = MAIN[k], t = s.tables[0], p = feeder(k);
+  if (!t || s.kind === "start") return "";
+  const outN = s.detail?.type === "group" ? s.detail.summary.rows.length : liveRows(t);
+  const inN = s.detail?.type === "filter" || s.detail?.type === "group" ? t.rows.length : p ? liveRows(p.tables[0]) : null;
+  const unit = s.detail?.groups ? "groups" : "rows";
+  return inN === null ? `out <b>${outN}</b> ${unit}` : `in <b>${inN}</b> ${unit} → out <b>${outN}</b>`;
+}
+
+function panel() {
+  const s = MAIN[cur], f = F[sub];
+  const dots = F.length > 1 ? F.map((x, i) => `<button class="${i === sub ? "on" : i < sub ? "done" : ""} ${x.end ? "end" : ""}" data-sub="${i}" title="${esc(x.label)}"></button>`).join("") : "";
+  return `<div class="panel ${enter ? "fade" : ""}" data-kind="${s.kind}">
+    <div class="p-head"><span class="p-title">${esc(s.title)}</span>${s.scope ? `<span class="p-scope">${esc(s.scope)}</span>` : ""}<span class="p-flow">${flow(cur)}</span></div>
+    <div class="p-explain">${brief(s)}</div>
+    ${F.length > 1 ? `<div class="sub">
+      <button class="btn" data-go="-1" aria-label="Previous inner step" ${sub ? "" : "disabled"}>↑</button>
+      <button class="btn" data-go="1" aria-label="Next inner step" ${sub < F.length - 1 ? "" : "disabled"}>↓</button>
+      <button class="btn" data-play>${timer ? "❚❚ Pause" : "▶ Play"}</button>
+      <span class="label">${esc(f.label)}${f.sub ? `<small>${esc(f.sub)}</small>` : ""}</span>
+      <div class="dots">${dots}</div></div>` : ""}
+    ${f.card ? `<div class="focus-card">${f.card}</div>` : ""}
+    <div class="tables">${f.body}</div>
+  </div>`;
+}
+
+function render(scroll = true) {
+  const s = MAIN[cur], f = F[sub];
+  let html = "";
+  const starts = MAIN.map((x, i) => i).filter(i => MAIN[i].stmt === null);
+  if (starts.length) html += `<div class="card start-card"><div class="card-head">${starts.map(badge).join("")} Starting tables</div>${starts.includes(cur) ? panel() : ""}</div>`;
+  SC.statements.forEach((st, k) => {
+    if (st.phase !== "code") return;
+    const mine = MAIN.map((x, i) => i).filter(i => MAIN[i].stmt === k);
+    if (!mine.length) return;
+    const text = st.text, lines = text.split("\n"), last = lines.length - 1;
+    const at = mine.map(i => {
+      const r = range(MAIN[i]), whole = ["change", "error"].includes(MAIN[i].kind);
+      return { i, r, whole, from: whole ? last : lineOf(text, r[0]), to: whole ? last : lineOf(text, r[1]) };
+    });
+    const active = at.find(a => a.i === cur), under = active && f && f.under;
+    const n = SC.statements.slice(0, k + 1).filter(x => x.phase === "code").length;
+    html += `<div class="card"><div class="card-head">Statement ${n}</div><div class="lines">`;
+    let offset = 0;
+    lines.forEach((ln, li) => {
+      const a0 = offset, a1 = offset + ln.length;
+      // paint: highlight the active part, underline the inner step's focus
+      const cuts = [a0, a1];
+      if (active) cuts.push(...active.r);
+      if (under) cuts.push(...under);
+      const pts = [...new Set(cuts.filter(x => x >= a0 && x <= a1))].sort((a, b) => a - b);
+      let src = "";
+      for (let p = 0; p < pts.length - 1; p++) {
+        const x0 = pts[p], x1 = pts[p + 1];
+        let seg = highlight(text.slice(x0, x1));
+        if (under && x0 >= under[0] && x1 <= under[1]) seg = `<u class="focus">${seg}</u>`;
+        if (active && x0 >= active.r[0] && x1 <= active.r[1]) seg = `<mark class="hl">${seg}</mark>`;
+        src += seg;
+      }
+      const dim = active && !active.whole && (li < lineOf(text, active.r[0]) || li > active.to);
+      html += `<div class="line ${dim ? "dim" : ""}"><div class="gut">${at.filter(a => a.from === li).map(a => badge(a.i)).join("")}</div><div class="src">${src || " "}</div></div>`;
+      if (active && li === active.to) html += panel();
+      offset = a1 + 1;
+    });
+    html += `</div></div>`;
+  });
+  $("#doc").innerHTML = html;
+  $("#label").innerHTML = `<span style="color:var(--muted)">Part ${cur + 1} of ${MAIN.length}</span> &nbsp; <b>${esc(s.title)}</b>`;
+  $("#prev").disabled = cur === 0;
+  $("#next").disabled = cur === MAIN.length - 1;
+  if (scroll) document.querySelector(".panel")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+
+function stop() { timer = null; }
+function go(i) {
+  stop(); stepping++; busy = rush = false; wake();
+  $("#doc").style.minHeight = "";  // a height hold left by an interrupted move
+  const was = cur, old = document.querySelector("#doc .panel:not(.ghost)");
+  cur = Math.max(0, Math.min(i, MAIN.length - 1)); F = frames(cur); sub = 0;
+  if (!old || was === cur || matchMedia("(prefers-reduced-motion: reduce)").matches) { enter = true; render(); enter = false; return; }
+  const a = anchor(was), b = anchor(cur), lo = Math.min(a.line, b.line), hi = Math.max(a.line, b.line);
+  if (a.stmt === null || a.stmt !== b.stmt || hi - lo > NEAR || !document.startViewTransition) return morphPart(old);
+  // Nearby line (like FROM then JOIN): the table on screen carries on into the next part and is
+  // altered in place, instead of one panel folding shut and another opening. The code lines it passes
+  // fade in at their new spot once the panel has moved, so nothing slides across the table.
+  const next = document.createElement("template"); next.innerHTML = F[0].body;
+  // the table on screen that carries on: the one holding the same rows, else the last one
+  const rowsOf = t => [...t.querySelectorAll("tbody tr")].map(r => r.dataset.rk).join("|");
+  const first = next.content.querySelector(".tbl"), tbls = [...old.querySelectorAll(".tbl")];
+  const last = first && tbls.find(t => rowsOf(t) === rowsOf(first)) || tbls.at(-1);
+  if (first && last) {
+    tbls.forEach(t => { if (t.dataset.vt === first.dataset.vt) t.dataset.vt = "was-" + t.dataset.vt; });
+    last.dataset.vt = first.dataset.vt;
+    last.dataset.keep = 1;
+  }
+  // The carried table is the real element, resized and moved in place (a snapshot would be stretched
+  // to the old size, so it looked like a blown-up new table instead of this one shrinking).
+  const r0 = last?.getBoundingClientRect(), f0 = last && getComputedStyle(last.querySelector("table")).fontSize;
+  const top0 = old.getBoundingClientRect().top, me = stepping, m = marks(); busy = true;
+  // the explanation is real too: it grows or shrinks to its new length and pushes the table along,
+  // instead of its new lines appearing on top of the table
+  const ex0 = old.querySelector(".p-explain"), eh0 = ex0.offsetHeight; ex0.dataset.keep = 1;
+  // hold the page height while things move: a page that got shorter mid-move would scroll by itself,
+  // which moves the real page but not the snapshots
+  const doc = $("#doc"); doc.style.minHeight = doc.offsetHeight + "px";
+  document.documentElement.classList.add("vt-ride");
+  let glide = () => [];
+  const vt = morph(() => {
+    render(false); fadeMarks(m);
+    const t1 = last && document.querySelector(`.panel .tbl[data-vt="${CSS.escape(first.dataset.vt)}"]`);
+    if (t1) t1.dataset.keep = 1;
+    const ex1 = document.querySelector("#doc .panel .p-explain"); ex1.dataset.keep = 1;
+    nameTables();
+    // Measure the final layout now (after morph() restored the scroll), but only start moving things once
+    // the browser has recorded where everything ends up; moving them earlier made it record the wrong
+    // spots, so the contents slid to the wrong place and then snapped.
+    queueMicrotask(() => {
+      const p = document.querySelector("#doc .panel"), dy = top0 - p.getBoundingClientRect().top, eh1 = ex1.offsetHeight;
+      const r1 = t1?.getBoundingClientRect(), tb = t1?.querySelector("table"), f1 = tb && getComputedStyle(tb).fontSize;
+      glide = () => {
+        // The real panel box slides from its old spot; the snapshots of what stays in it (vt-ride on the
+        // root) just ride along on it, so nothing pokes out of the box or lags behind it.
+        const wait = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--vt-wait")) * 1000 || 0;
+        const opt = { duration: 800, delay: wait, easing: "cubic-bezier(.45, 0, .25, 1)", fill: "backwards" };
+        const anims = dy ? [p.animate({ translate: [`0 ${dy}px`, "0 0"] }, opt)] : [];
+        if (eh0 !== eh1) {
+          ex1.style.overflow = "clip";
+          const a = ex1.animate({ height: [eh0 + "px", eh1 + "px"] }, opt);
+          a.finished.finally(() => ex1.style.overflow = "");
+          anims.push(a);
+        }
+        // the table's layout spot moves with the growing explanation, so that part is taken off its own offset
+        if (t1) anims.push(t1.animate([{ width: r0.width + "px", transform: `translate(${r0.left - r1.left}px, ${r0.top - r1.top - dy + eh1 - eh0}px)` },
+          { width: r1.width + "px", transform: "none" }], opt), tb.animate({ fontSize: [f0, f1] }, opt));
+        return anims.map(quick);
+      };
+    });
+    const lines = [...document.querySelector("#doc .panel").closest(".card").querySelectorAll(".line")].filter((l, j) => j > lo && j <= hi);
+    lines.forEach(l => l.style.opacity = 0);
+    // runs right after morph() has worked out the timing (--vt-grow: when everything is in place)
+    queueMicrotask(() => {
+      const at = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--vt-grow")) * 1000 || 0;
+      lines.forEach(l => { l.style.opacity = ""; quick(l.animate({ opacity: [0, 1] }, { duration: 400, delay: at, fill: "backwards" })); });
+    });
+  });
+  // the snapshots can finish before the box has slid into place, so wait for both
+  const slid = vt.ready.then(() => Promise.allSettled(glide().map(a => a.finished)), () => {});
+  Promise.allSettled([vt.finished, slid]).then(() => {
+    document.documentElement.classList.remove("vt-ride");
+    document.querySelectorAll(".panel [data-keep]").forEach(e => delete e.dataset.keep);  // next steps morph it as usual
+    if (me !== stepping) return;
+    // let the page shrink back gently, not in one jump (natural height measured before letting go)
+    const held = doc.style.minHeight, natural = doc.lastElementChild.getBoundingClientRect().bottom - doc.getBoundingClientRect().top;
+    doc.style.minHeight = "";
+    if (held) doc.animate({ minHeight: [held, natural + "px"] }, { duration: 600, easing: "cubic-bezier(.45, 0, .25, 1)" });
+    busy = rush = false;
+    document.querySelector("#doc .panel").scrollIntoView({ block: "nearest", behavior: "smooth" });
+  });
+}
+const NEAR = 2;  // panels at most this many code lines apart morph in place; farther ones fold and open
+// The code line a part's panel opens under.
+function anchor(i) {
+  const m = MAIN[i]; if (m.stmt === null) return { stmt: null, line: 0 };
+  const text = SC.statements[m.stmt].text;
+  return { stmt: m.stmt, line: ["change", "error"].includes(m.kind) ? text.split("\n").length - 1 : lineOf(text, range(m)[1]) };
+}
+
+// Changing parts: the old panel folds shut where it was while the new one opens under its line,
+// the page scrolls along, and the code highlight fades over, so the eye can follow the move.
+function morphPart(old) {
+  const D = 700, EASE = "cubic-bezier(.45, 0, .25, 1)", me = stepping;
+  const cards = () => [...document.querySelectorAll("#doc > .card")];
+  const card = old.closest(".card"), ci = cards().indexOf(card);
+  const li = [...card.querySelectorAll(".line")].indexOf(old.previousElementSibling);  // -1: under the card head
+  const h0 = old.getBoundingClientRect().height, y0 = scrollY;
+  const wasDim = cards().map(c => [...c.querySelectorAll(".line")].map(l => l.classList.contains("dim")));
+  const ghost = old.cloneNode(true);
+  ghost.classList.add("ghost"); ghost.inert = true;
+  [ghost, ...ghost.querySelectorAll("[style]")].forEach(e => e.style.viewTransitionName = "");
+
+  render(false);
+  const p = document.querySelector("#doc .panel"), r = p.getBoundingClientRect(), h1 = r.height;
+  // where the page should end up: the new panel in view, like scrollIntoView({block: "nearest"})
+  const top = r.top + scrollY - 70, bottom = r.bottom + scrollY + 24;
+  const y1 = bottom - innerHeight > y0 ? Math.min(top, bottom - innerHeight) : top < y0 ? top : y0;
+  const nc = cards()[ci];
+  (li >= 0 ? nc.querySelectorAll(".line")[li] : nc.querySelector(".card-head")).after(ghost);
+  scrollTo(scrollX, y0);
+
+  const shut = { height: "0px", marginTop: "0px", marginBottom: "0px", paddingTop: "0px", paddingBottom: "0px", opacity: 0 };
+  const opt = { duration: D, easing: EASE };
+  ghost.style.overflow = p.style.overflow = "clip";
+  ghost.animate([{ height: h0 + "px" }, shut], { ...opt, fill: "forwards" }).finished.then(() => ghost.remove(), () => {});
+  const grow = p.animate([shut, { height: h1 + "px" }], opt);
+  grow.finished.then(() => p.style.overflow = "", () => {});
+  cards().forEach((c, k) => c.querySelectorAll(".line").forEach((l, j) => {
+    const d = l.classList.contains("dim");
+    if (wasDim[k] && d !== wasDim[k][j]) l.querySelector(".src").animate([{ opacity: d ? 1 : .4 }, { opacity: d ? .4 : 1 }], opt);
+  }));
+  document.querySelectorAll("#doc mark.hl, #doc .badge.on").forEach(m => m.animate([{ offset: 0, backgroundColor: "transparent", boxShadow: "none" }], opt));
+  // scroll in step with the panels (reads the animation's clock, so fast-forward speeds it up too)
+  const ease = t => t < .5 ? 4 * t * t * t : 1 - (2 - 2 * t) ** 3 / 2;
+  const tick = () => {
+    if (me !== stepping) return;
+    const t = Math.min(1, (grow.currentTime ?? D) / D);
+    scrollTo(scrollX, y0 + (y1 - y0) * ease(t));
+    if (t < 1) requestAnimationFrame(tick);
+  };
+  if (y1 !== y0) requestAnimationFrame(tick);
+}
+// Inner steps morph in place: tables with the same key slide/resize, new ones fade in, old ones fade out.
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+let stepping = 0, busy = false, rush = false, wake = () => {};
+// A pause that ends early when the learner asks to fast-forward.
+const nap = ms => new Promise(r => { if (rush) return r(); const t = setTimeout(r, ms); wake = () => { clearTimeout(t); r(); }; });
+const FAST = 8;
+const quick = a => { if (rush) a.playbackRate = FAST; return a; };
+function hurry() { rush = true; wake(); document.getAnimations().forEach(a => a.playbackRate = FAST); }
+async function step(n, keepPlaying) {
+  if (!keepPlaying) stop();
+  if (busy) return hurry();  // an animation is playing: finish it quickly instead of starting another
+  n = Math.max(0, Math.min(n, F.length - 1));
+  if (n === sub) return;
+  const me = ++stepping; busy = true; rush = false;
+  try { await animateTo(n, me); } finally { if (me === stepping) { busy = false; rush = false; } }
+}
+async function animateTo(n, me) {
+  const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // going forward, first remove rows/columns live from the table on screen
+  if (!calm && n > sub && await liveCut(n) && me !== stepping) return;  // a part change took over
+  sub = n;
+  // new JOIN rows stay hidden until flyMerge() lands their values in them
+  const old = marks(), update = () => { render(false); if (!calm) { fadeMarks(old); document.querySelectorAll(".panel tr[data-l]").forEach(tr => tr.style.opacity = 0); } nameTables(); };
+  if (!document.startViewTransition || calm) return update();
+  await morph(update).finished;
+  if (me === stepping) await flyMerge();
+}
+
+// Swap the panel's content with a view transition: same-named tables glide and resize in place.
+function morph(update) {
+  nameTables();
+  const before = boxes(), h0 = document.querySelector(".panel").offsetHeight;
+  const y = scrollY, live = [];
+  const vt = document.startViewTransition(() => {
+    update();
+    // three phases, each skipped when it has nothing to do: leave (shrink), then move, then enter (grow)
+    const after = boxes(), out = [...before.keys()].some(n => !after.has(n));
+    const moves = [...after].some(([n, b]) => before.has(n) && before.get(n) !== b);
+    const wait = out ? 0.6 : 0, move = moves ? 0.8 : 0;
+    document.documentElement.style.setProperty("--vt-wait", wait + "s");
+    document.documentElement.style.setProperty("--vt-grow", wait + move + "s");
+    // The panel itself is not a snapshot: its real height animates, so the statement box and
+    // everything below it grow and shrink along with it instead of jumping.
+    const p = document.querySelector(".panel"), h1 = p.offsetHeight;
+    if (h0 !== h1) {
+      p.style.overflow = "clip";
+      const a = quick(p.animate({ height: [h0 + "px", h1 + "px"] }, { duration: 800, delay: wait * 1000, easing: "cubic-bezier(.45, 0, .25, 1)", fill: "backwards" }));
+      a.finished.finally(() => p.style.overflow = "");
+      live.push(a);
+      scrollTo(scrollX, y);  // measuring the shorter page made the browser jump the scroll; put it back
+    }
+  });
+  vt.ready.then(() => { syncToVT(live); if (rush) hurry(); }, () => {});  // a part change can cut this short; that's expected
+  return vt;
+}
+// Real-element animations run on the same clock as the view transition's snapshots. The browser starts
+// those a few frames late, so otherwise the two drift apart mid-move (text poking out of its box).
+function syncToVT(anims) {
+  const g = document.getAnimations().find(a => a.effect?.pseudoElement?.startsWith("::view-transition-group"));
+  if (g) g.ready.then(() => anims.forEach(a => { if (a.playState !== "finished") a.startTime = g.startTime; }));
+}
+
+// When the next step shows the same table minus some rows/columns, do it on the table on screen:
+// cross the leaving rows out, then fold them away (full width, height only) and shrink leaving columns.
+async function liveCut(n) {
+  const next = document.createElement("template"); next.innerHTML = F[n].body;
+  const jobs = [];
+  document.querySelectorAll(".panel .tbl").forEach(t => {
+    const nt = next.content.querySelector(`.tbl[data-vt="${CSS.escape(t.dataset.vt)}"]`); if (!nt) return;
+    const want = {};
+    nt.querySelectorAll("tbody tr").forEach(r => want[r.dataset.rk] = (want[r.dataset.rk] || 0) + 1);
+    const rows = [...t.querySelectorAll("tbody tr")].filter(r => !(want[r.dataset.rk]-- > 0));
+    if (Object.values(want).some(c => c > 0)) return;  // the next table has rows this one lacks: not a pure cut
+    const heads = [...nt.querySelectorAll("thead th")].map(th => th.textContent);
+    const cols = [...t.querySelectorAll("thead th")].flatMap((th, k) => { const j = heads.indexOf(th.textContent); if (j < 0) return [k]; heads.splice(j, 1); return []; });
+    if (rows.length || cols.length) jobs.push({ t, rows, cols });
+  });
+  if (!jobs.length) return false;
+  const dur = { duration: 600, easing: "cubic-bezier(.45, 0, .25, 1)", fill: "forwards" };
+  const rows = jobs.flatMap(j => j.rows);
+  if (rows.length) {  // 1. a red line sweeps across each leaving row, left to right
+    const sweep = rows.flatMap(r => { r.classList.add("m-strike"); const W = r.offsetWidth;
+      return [...r.children].map(c => quick(c.animate({ backgroundSize: ["0% 2px", "100% 2px"] },
+        { duration: 500 * c.offsetWidth / W, delay: 500 * c.offsetLeft / W, fill: "both" }))); });
+    await Promise.all(sweep.map(a => a.finished)); await nap(250);
+  }
+  const fold = [];  // 2. leaving rows fold flat and leaving columns shrink, while the rest close the gap
+  rows.forEach(r => [...r.children].forEach(c => { const cs = getComputedStyle(c);  // cells squash flat as the row closes up
+    fold.push(quick(c.animate({ transform: ["scaleY(1)", "scaleY(0)"], paddingTop: [cs.paddingTop, "0px"], paddingBottom: [cs.paddingBottom, "0px"],
+      lineHeight: [cs.lineHeight, "0px"], borderBottomWidth: [cs.borderBottomWidth, "0px"], backgroundSize: ["100% 2px", "100% 0px"] }, dur))); }));
+  jobs.forEach(j => j.t.querySelectorAll("tr").forEach(r => j.cols.forEach(k => { const c = r.children[k]; if (c)
+    fold.push(quick(c.animate({ paddingLeft: [getComputedStyle(c).paddingLeft, "0px"], paddingRight: [getComputedStyle(c).paddingRight, "0px"], fontSize: [getComputedStyle(c).fontSize, "0px"] }, dur))); })));
+  await Promise.all(fold.map(a => a.finished));
+  return true;
+}
+function boxes() {
+  const m = new Map();
+  const p = document.querySelector(".panel"); if (p) m.set("panel", p.offsetHeight);
+  document.querySelectorAll(".panel [style*=view-transition-name]").forEach(e => {
+    const r = e.getBoundingClientRect(); m.set(e.style.viewTransitionName, [r.x, r.y, r.width, r.height].map(Math.round).join());
+  });
+  return m;
+}
+// Which rows/columns each table has outlined, so the next step can fade outlines in and out.
+function marks() {
+  const m = {};
+  document.querySelectorAll(".panel .tbl").forEach(t => {
+    const rows = [...t.querySelectorAll("tbody tr")], has = c => rows.flatMap((r, i) => r.classList.contains(c) ? [i] : []);
+    m[t.dataset.vt] = { cur: has("m-current"), grp: has("m-grp"),
+      sel: Object.fromEntries([...t.querySelectorAll("thead th")].flatMap((th, i) => th.classList.contains("sel") ? [[i, th.style.getPropertyValue("--w")]] : [])) };
+  });
+  return m;
+}
+function fadeMarks(old) {
+  document.querySelectorAll(".panel .tbl").forEach(t => {
+    const o = old[t.dataset.vt]; if (!o) return;
+    t.querySelectorAll("tbody tr").forEach((r, i) => {
+      for (const [c, list, was] of [["m-current", o.cur, "m-was"], ["m-grp", o.grp, "m-gw"]]) {
+        const now = r.classList.contains(c), before = list.includes(i);
+        if (now && !before) r.classList.add("hl-in");
+        if (!now && before) r.classList.add(was, "hl-out");
+      }
+    });
+    const head = [...t.querySelectorAll("thead th")], body = [...t.querySelectorAll("tbody tr")].map(r => [...r.children]);
+    head.forEach((th, k) => {
+      const cells = [th, ...body.map(r => r[k]).filter(Boolean)], now = th.classList.contains("sel"), before = k in o.sel;
+      if (now && !before) cells.forEach(c => c.classList.add("hl-in"));
+      if (!now && before) cells.forEach(c => { c.classList.add("selw", "hl-out"); c.style.setProperty("--w", o.sel[k]); });
+    });
+  });
+}
+function nameTables() {
+  const seen = {};
+  document.querySelectorAll(".panel .tbl").forEach(t => {
+    if (t.dataset.keep) return void (t.style.viewTransitionName = "");  // animated for real by go(), not as a snapshot
+    const k = (t.dataset.vt || "t").replace(/[^\w-]/g, "_");
+    t.style.viewTransitionName = `vt-${k}${seen[k] ? "-" + seen[k] : ""}`;
+    seen[k] = (seen[k] || 0) + 1;
+  });
+  const c = document.querySelector(".panel .focus-card"); if (c) c.style.viewTransitionName = "vt-card";
+  // everything in the panel is named, so the panel box itself can just grow or shrink smoothly
+  for (const [sel, n] of [["header", "vt-header"], [".panel .p-head", "vt-head"], [".panel .p-explain", "vt-explain"], [".panel .sub", "vt-sub"]]) {
+    const el = document.querySelector(sel); if (el) el.style.viewTransitionName = el.dataset.keep ? "" : n;
+  }
+}
+// Play waits for each step's animation to finish, then pauses so it can be read.
+async function play() {
+  if (timer) { stop(); render(false); return; }
+  if (sub >= F.length - 1) sub = 0;
+  const me = timer = {}; render(false);
+  while (timer === me && sub < F.length - 1) { await sleep(1500); if (timer !== me) return; await step(sub + 1, true); }
+  if (timer === me) { stop(); render(false); }
+}
+
+// Mid-animation the browser sends every click to <html>; pass it on to the button under the pointer
+// so the arrows keep working (and fast-forward the animation).
+document.addEventListener("click", e => {
+  if (e.target !== document.documentElement || !document.querySelector(".panel")) return;
+  const b = [...document.querySelectorAll("[data-go], [data-play], [data-sub], .badge[data-i], #prev, #next")].find(el => {
+    const r = el.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; });
+  if (b && !b.disabled) b.click();
+});
+$("#prev").onclick = () => go(cur - 1);
+$("#next").onclick = () => go(cur + 1);
+$("#doc").onclick = e => {
+  const b = e.target.closest(".badge[data-i]"); if (b) return go(+b.dataset.i);
+  const g = e.target.closest("[data-go]"); if (g) return step(sub + +g.dataset.go);
+  const d = e.target.closest("[data-sub]"); if (d) return step(+d.dataset.sub);
+  if (e.target.closest("[data-play]")) play();
+};
+document.addEventListener("keydown", e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); run(); return; }
+  if (!MAIN.length || e.target.closest("textarea, input") || (e.key === " " && e.target.closest("button"))) return;
+  if (e.key === "ArrowRight") { e.preventDefault(); go(cur + 1); }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); go(cur - 1); }
+  else if (e.key === "ArrowDown") { e.preventDefault(); step(sub + 1); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); step(sub - 1); }
+  else if (e.key === " ") { e.preventDefault(); play(); }
+});
+
+// ---------- run ----------
+const RUN_BTN = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l14 8-14 8z"/></svg><span>Run</span>`;
+async function run() {
+  const btn = $("#run");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  btn.innerHTML = `<div class="spin"></div><span>Running</span>`;
+  try {
+    const r = await fetch("/run", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ setup: $("#setup").value, code: $("#code").value }) });
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
+    build(data);
+    if (!MAIN.length) throw new Error("There was nothing to step through.");
+    $(".dock").hidden = false;
+    $("#doc").innerHTML = "";  // new query: nothing to animate from
+    go(Math.max(0, MAIN.findIndex(m => m.kind === "error")));  // an error is what the user needs to see first
+  } catch (e) {
+    MAIN = []; stop(); stepping++; busy = false;
+    $(".dock").hidden = true;
+    $("#doc").innerHTML = `<div class="error-box"><b>Something went wrong.</b><br>${esc(e.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = RUN_BTN;
+  }
+}
+$("#run").onclick = run;
+run();  // the database is ready when the page loads, so show the saved code straight away
+</script>
+</body>
+</html>
