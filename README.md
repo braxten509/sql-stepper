@@ -12,6 +12,16 @@ SQL Stepper already shows students how a SQL query changes a table step by step.
 
 For example, a blood bank assignment says staff can work at several locations. If a student's staff table has room for only one location per person, the coach could ask, “How would you record Maya working at two locations with a single staff record?”
 
+## Design sketches
+
+### System design
+
+![Hand-drawn system design showing the client, local diagram storage, Cloudflare, and OpenRouter.](docs/sketches/system-design.jpg)
+
+### ERD
+
+![Hand-drawn data model showing a diagram, its entities, their attributes, and the relationships between entities.](docs/sketches/erd.jpg)
+
 ## Current SQL Stepper tech stack
 
 | Part | Technology |
